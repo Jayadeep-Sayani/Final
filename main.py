@@ -106,7 +106,7 @@ def create_timetables(schedule_requests, sequencing):
                     prereq = course
                 if (course.course_id == course_id_2):
                     subseq = course
-          
+            # e
             if prereq is not None and subseq is not None and prereq not in timetable.semester_1 and subseq not in timetable.semester_2:
                 timetable.add_course(prereq, 1)
                 timetable.add_course(subseq, 2)
