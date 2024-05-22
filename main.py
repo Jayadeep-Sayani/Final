@@ -3,6 +3,7 @@ import random
 import pandas as pd
 
 #hi !
+#hello!
 class CoursesRequest:
     def __init__(self):
         self.main_courses = []
