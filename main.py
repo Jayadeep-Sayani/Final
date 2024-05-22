@@ -2,6 +2,7 @@ import csv
 import random
 import pandas as pd
 
+#hi !
 class CoursesRequest:
     def __init__(self):
         self.main_courses = []
