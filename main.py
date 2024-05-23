@@ -2,9 +2,18 @@ import csv
 import random
 import pandas as pd
 
+
+outside_timetables = [
+        'XC---09--L', 'MDNC-09C-L', 'MDNC-09M-L', 'XBA--09J-L', 'XLDCB09S-L', 'YCPA-0AX-L',
+        'MDNCM10--L', 'YED--0BX-L', 'MMUCC10--L', 'YCPA-0AXE-', 'MMUOR10S-L', 'MDNC-10--L',
+        'MIDS-0C---', 'MMUJB10--L', 'MDNC-11--L', 'YCPA-1AX-L', 'MDNCM11--L', 'YCPA-1AXE-',
+        'MGRPR11--L', 'MGMT-12L--', 'YED--1EX-L', 'MWEX-2A--L', 'MCMCC11--L', 'MWEX-2B--L',
+        'MIMJB11--L', 'MMUOR11S-L', 'MDNC-12--L', 'YCPA-2AX-L', 'MDNCM12--L', 'YCPA-2AXE-',
+        'MGRPR12--L', 'MGMT-12L--', 'YED--2DX-L', 'YED--2FX-L', 'MCMCC12--L', 'MWEX-2A--L',
+        'MIMJB12--L', 'MWEX-2B--L', 'MMUOR12S-', ''
+    ]
+
 # CourseRequest class
-#hi !
-#hello!
 class CoursesRequest:
 
     # Constructor
@@ -12,14 +21,18 @@ class CoursesRequest:
         self.main_courses = []
         self.alternative_courses = []
         self.courses = []
+        self.outsides = []
         self.id = 0
 
     # Adds course to the Timetable Request
     def add_course(self, course):
-        if course.alternate == 'Y':
-            self.alternative_courses.append(course)
+        if course.outside:
+            self.outsides.append(course)
         else:
-            self.main_courses.append(course)
+            if course.alternate == 'Y':
+                self.alternative_courses.append(course)
+            else:
+                self.main_courses.append(course)
         
         self.courses.append(course)
 
@@ -44,8 +57,9 @@ class CoursesRequest:
 class Course:
 
     # Constructor
-    def __init__(self, name, course_id_, alt):
+    def __init__(self, name, course_id_, alt, outside):
         self.name = name
+        self.outside = outside
         self.course_id = course_id_
         self.alternate = alt
 
@@ -57,6 +71,7 @@ class Timetable:
     def __init__(self):
         self.semester_1 = []
         self.semester_2 = []
+        self.outsides = []
 
     # Adds course to a specified semester
     def add_course(self, course, semester):
@@ -70,6 +85,8 @@ class Timetable:
                 self.semester_2.append(course)
             else:
                 print("cant add sem 2")
+        elif semester == 5:
+            self.outsides.append(course)
         else:
             if len(self.semester_1) < 4:
                 self.semester_1.append(course)
@@ -90,7 +107,7 @@ def extract_schedules():
                     schedules.append(schedule)
                     schedule = CoursesRequest()
                 else:
-                    course_to_add = Course(lines[3], lines[0], lines[11])
+                    course_to_add = Course(lines[3], lines[0], lines[11], lines[0] in outside_timetables)
                     schedule.add_course(course_to_add)
             else:
                 schedule.change_id(lines[1])
@@ -106,10 +123,14 @@ def create_timetables(schedule_requests, sequencing):
     fulfilled_requests = 0
     
     for schedule_request in schedule_requests:
+        
         courses = schedule_request.get_course_requests()
         can_schedule = True
         timetable = Timetable()  # Create a new timetable for each schedule request
         
+        for out in schedule_request.outsides:
+            timetable.add_course(out, 5)
+
         # Check if the schedule request has both a prerequisite and a subsequent
         for seq_pair in sequencing:
             course_id_1, course_id_2 = seq_pair
@@ -199,7 +220,7 @@ def extract_blockings(file_path='blockings.csv'):
 # Extracts data
 all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
-# blockings = extract_blockings()
+
 
 # Create timetables and get stats
 timetables, fulfilled_requests = create_timetables(all_schedule_requests, sequencing)
@@ -209,3 +230,4 @@ export_timetables_to_excel(timetables)
 # Prints the stats
 print(f"Total schedule requests: {len(all_schedule_requests)}")
 print(f"Fulfilled schedule requests: {fulfilled_requests}")
+
