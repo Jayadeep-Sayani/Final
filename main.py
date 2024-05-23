@@ -98,7 +98,7 @@ def extract_schedules():
     return schedules
 
 
-#----------------------------------------------------------------
+#---------------------------------------------------------------
 
 # Creates the timetables based on requests
 def create_timetables(schedule_requests, sequencing):
