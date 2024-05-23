@@ -202,15 +202,16 @@ def extract_sequencing(file_path='Course Sequencing Rules.csv'):
     return sequences
 
 # Gets blocking rules from csv file
-def extract_blockings(file_path='blockings.csv'):
+def extract_blockings(file_path='Course Blocking Rules.csv'):
     blockings = []
 
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             blocking_rule = line[2].split(" in a ")[0][9:].split(", ")
-            blockings.append(blocking_rule)
-    
+            if len(blocking_rule) != 1 and blocking_rule[0] != '':
+                blockings.append(blocking_rule)
+    print(blockings)
     return blockings
 
 
@@ -220,7 +221,7 @@ def extract_blockings(file_path='blockings.csv'):
 # Extracts data
 all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
-
+blockings = extract_blockings()
 
 # Create timetables and get stats
 timetables, fulfilled_requests = create_timetables(all_schedule_requests, sequencing)
