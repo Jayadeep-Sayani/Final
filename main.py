@@ -1,21 +1,18 @@
 import csv
-import random
 import pandas as pd
 
-
 outside_timetables = [
-        'XC---09--L', 'MDNC-09C-L', 'MDNC-09M-L', 'XBA--09J-L', 'XLDCB09S-L', 'YCPA-0AX-L',
-        'MDNCM10--L', 'YED--0BX-L', 'MMUCC10--L', 'YCPA-0AXE-', 'MMUOR10S-L', 'MDNC-10--L',
-        'MIDS-0C---', 'MMUJB10--L', 'MDNC-11--L', 'YCPA-1AX-L', 'MDNCM11--L', 'YCPA-1AXE-',
-        'MGRPR11--L', 'MGMT-12L--', 'YED--1EX-L', 'MWEX-2A--L', 'MCMCC11--L', 'MWEX-2B--L',
-        'MIMJB11--L', 'MMUOR11S-L', 'MDNC-12--L', 'YCPA-2AX-L', 'MDNCM12--L', 'YCPA-2AXE-',
-        'MGRPR12--L', 'MGMT-12L--', 'YED--2DX-L', 'YED--2FX-L', 'MCMCC12--L', 'MWEX-2A--L',
-        'MIMJB12--L', 'MWEX-2B--L', 'MMUOR12S-', ''
-    ]
+    'XC---09--L', 'MDNC-09C-L', 'MDNC-09M-L', 'XBA--09J-L', 'XLDCB09S-L', 'YCPA-0AX-L',
+    'MDNCM10--L', 'YED--0BX-L', 'MMUCC10--L', 'YCPA-0AXE-', 'MMUOR10S-L', 'MDNC-10--L',
+    'MIDS-0C---', 'MMUJB10--L', 'MDNC-11--L', 'YCPA-1AX-L', 'MDNCM11--L', 'YCPA-1AXE-',
+    'MGRPR11--L', 'MGMT-12L--', 'YED--1EX-L', 'MWEX-2A--L', 'MCMCC11--L', 'MWEX-2B--L',
+    'MIMJB11--L', 'MMUOR11S-L', 'MDNC-12--L', 'YCPA-2AX-L', 'MDNCM12--L', 'YCPA-2AXE-',
+    'MGRPR12--L', 'MGMT-12L--', 'YED--2DX-L', 'YED--2FX-L', 'MCMCC12--L', 'MWEX-2A--L',
+    'MIMJB12--L', 'MWEX-2B--L', 'MMUOR12S-', ''
+]
 
 # CourseRequest class
 class CoursesRequest:
-
     # Constructor
     def __init__(self):
         self.main_courses = []
@@ -33,10 +30,9 @@ class CoursesRequest:
                 self.alternative_courses.append(course)
             else:
                 self.main_courses.append(course)
-        
         self.courses.append(course)
 
-    # Returns the course requests in a scheudle request
+    # Returns the course requests in a schedule request
     def get_course_requests(self):
         return self.main_courses
     
@@ -55,18 +51,16 @@ class CoursesRequest:
 
 # Course class
 class Course:
-
     # Constructor
-    def __init__(self, name, course_id_, alt, outside):
+    def __init__(self, name, course_id_, alt, outside, linear):
         self.name = name
         self.outside = outside
         self.course_id = course_id_
         self.alternate = alt
-
+        self.linear = linear  # New attribute to indicate if the course is linear
 
 # Timetable class - Timetable created based on a person's request
 class Timetable:
-
     # Constructor
     def __init__(self):
         self.semester_1 = []
@@ -79,27 +73,31 @@ class Timetable:
             if len(self.semester_1) < 4:
                 self.semester_1.append(course)
             else:
-                print("Cant add semester 1")
+                print("Can't add to semester 1")
         elif semester == 2:
             if len(self.semester_2) < 4:
                 self.semester_2.append(course)
             else:
-                print("cant add sem 2")
+                print("Can't add to semester 2")
         elif semester == 5:
             self.outsides.append(course)
+        elif course.linear:
+            if len(self.semester_1) < 4 and len(self.semester_2) < 4:
+                self.semester_1.append(course)
+                self.semester_2.append(course)
+            else:
+                print("Can't add linear course to both semesters")
         else:
             if len(self.semester_1) < 4:
                 self.semester_1.append(course)
             elif len(self.semester_2) < 4:
                 self.semester_2.append(course)
 
-
-
 # Extract schedules from csv file
-def extract_schedules():
+def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
     schedules = []
     schedule = CoursesRequest()
-    with open('Cleaned Student Requests.csv', mode ='r') as file:
+    with open(file_path, mode='r') as file:
         csvFile = csv.reader(file)
         for lines in csvFile:
             if (len(lines) > 2):
@@ -107,15 +105,13 @@ def extract_schedules():
                     schedules.append(schedule)
                     schedule = CoursesRequest()
                 else:
-                    course_to_add = Course(lines[3], lines[0], lines[11], lines[0] in outside_timetables)
+                    linear = "linear" in lines[3].lower()
+                    course_to_add = Course(lines[3], lines[0], lines[11], lines[0] in outside_timetables, linear)
                     schedule.add_course(course_to_add)
             else:
                 schedule.change_id(lines[1])
 
     return schedules
-
-
-#---------------------------------------------------------------
 
 # Creates the timetables based on requests
 def create_timetables(schedule_requests, sequencing):
@@ -123,9 +119,7 @@ def create_timetables(schedule_requests, sequencing):
     fulfilled_requests = 0
     
     for schedule_request in schedule_requests:
-        
         courses = schedule_request.get_course_requests()
-        can_schedule = True
         timetable = Timetable()  # Create a new timetable for each schedule request
         
         for out in schedule_request.outsides:
@@ -134,15 +128,14 @@ def create_timetables(schedule_requests, sequencing):
         # Check if the schedule request has both a prerequisite and a subsequent
         for seq_pair in sequencing:
             course_id_1, course_id_2 = seq_pair
-            pair_found = False
             prereq = None
             subseq = None
 
             # Finds the prereq and subseq
             for course in courses:
-                if (course.course_id == course_id_1):
+                if course.course_id == course_id_1:
                     prereq = course
-                if (course.course_id == course_id_2):
+                if course.course_id == course_id_2:
                     subseq = course
             
             # Adds the prerequisite to semester 1 and subsequent to semester 2
@@ -150,18 +143,22 @@ def create_timetables(schedule_requests, sequencing):
                 timetable.add_course(prereq, 1)
                 timetable.add_course(subseq, 2)
 
+        for course in courses:
+            if course.linear and course not in timetable.semester_1 and course not in timetable.semester_2 and len(timetable.semester_1) < 4 and len(timetable.semester_2) < 4:
+                timetable.add_course(course, 1)
+                timetable.add_course(course, 2)
+
         # Adds in the rest of the courses
         for course in courses:
             if course not in timetable.semester_1 and course not in timetable.semester_2:
                 if len(timetable.semester_1) < 4:
                     timetable.add_course(course, 1)
                 elif len(timetable.semester_2) < 4:
-                    timetable.add_course(course, 2) 
+                    timetable.add_course(course, 2)
 
         timetables.append(timetable)  # Add the completed timetable to the list
 
     return timetables, fulfilled_requests
-
 
 # Exports the master timetable to an excel file
 def export_timetables_to_excel(timetables):
@@ -183,37 +180,20 @@ def export_timetables_to_excel(timetables):
     df = pd.DataFrame(data)
     df.to_excel('timetables.xlsx', index=False)
 
-
 # Gets sequencing rules from csv file
-def extract_sequencing(file_path='Course Sequencing Rules.csv'):
+def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
     sequences = []
-
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[2].startswith("Sequence"):
                 parts = line[2].split(" before ")
                 parts[0] = parts[0].split(" ")[1]
-
                 for part in parts:
                     prereq = parts[0]
                     for subseq in parts[1].split(", "):
                         sequences.append((prereq, subseq))
     return sequences
-
-# Gets blocking rules from csv file
-def extract_blockings(file_path='Course Blocking Rules.csv'):
-    blockings = []
-
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        for line in csv_reader:
-            blocking_rule = line[2].split(" in a ")[0][9:].split(", ")
-            if len(blocking_rule) != 1 and blocking_rule[0] != '':
-                blockings.append(blocking_rule)
-    print(blockings)
-    return blockings
-
 
 # Main 
 #----------------------------
@@ -221,7 +201,6 @@ def extract_blockings(file_path='Course Blocking Rules.csv'):
 # Extracts data
 all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
-blockings = extract_blockings()
 
 # Create timetables and get stats
 timetables, fulfilled_requests = create_timetables(all_schedule_requests, sequencing)
@@ -231,4 +210,3 @@ export_timetables_to_excel(timetables)
 # Prints the stats
 print(f"Total schedule requests: {len(all_schedule_requests)}")
 print(f"Fulfilled schedule requests: {fulfilled_requests}")
-
