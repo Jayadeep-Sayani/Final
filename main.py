@@ -2,8 +2,6 @@ import csv
 import pandas as pd
 
 
-
-
 def extract_max_enrollment():
     
     # Initialize an empty list to store the course ID and max enrollment pairs
