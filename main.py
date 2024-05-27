@@ -1,6 +1,23 @@
 import csv
 import pandas as pd
 
+
+def extract_max_enrollment():
+    
+    # Initialize an empty list to store the course ID and max enrollment pairs
+    course_enrollment = []
+
+    # Read the CSV file
+    with open('data/Course Information.csv', mode='r') as file:
+        csv_reader = csv.reader(file)
+        for row in csv_reader:
+            if row[0] != '' and row[9] != '':
+                course_id = row[0]
+                max_enrollment = row[9]
+                course_enrollment.append((course_id, max_enrollment))
+    return course_enrollment
+
+
 max_enrollments = []
 
 outside_timetables = [
