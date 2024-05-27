@@ -1,6 +1,8 @@
 import csv
 import pandas as pd
 
+max_enrollments = []
+
 outside_timetables = [
     'XC---09--L', 'MDNC-09C-L', 'MDNC-09M-L', 'XBA--09J-L', 'XLDCB09S-L', 'YCPA-0AX-L',
     'MDNCM10--L', 'YED--0BX-L', 'MMUCC10--L', 'YCPA-0AXE-', 'MMUOR10S-L', 'MDNC-10--L',
@@ -94,7 +96,7 @@ class Timetable:
                 self.semester_2.append(course)
 
 # Extract schedules from csv file
-def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
+def extract_schedules(file_path='Cleaned Student Requests.csv'):
     schedules = []
     schedule = CoursesRequest()
     with open(file_path, mode='r') as file:
@@ -181,10 +183,10 @@ def export_timetables_to_excel(timetables):
     df.to_excel('timetables.xlsx', index=False)
 
 # Gets sequencing rules from csv file
-def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
+def extract_sequencing(file_path='Course Sequencing Rules.csv'):
     sequences = []
     with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
+        csv_reader = csv.reader(file_path)
         for line in csv_reader:
             if line[2].startswith("Sequence"):
                 parts = line[2].split(" before ")
@@ -195,12 +197,26 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
                         sequences.append((prereq, subseq))
     return sequences
 
+
+def extract_blockings(file_path='Course Blocking Rules.csv'):
+    with open(file_path, mode='r', encoding='utf-8'):
+        simulataneous_blocking = []
+        nonsimulataneous_blocking = []
+        term_blocking = [] 
+
+        csv_reader = csv.reader(file_path)
+        for line in csv_reader:
+            print(line)
+
+        return 1, 2, 3
+
 # Main 
 #----------------------------
 
 # Extracts data
 all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
+simulataneous_blockings, nonsimulataneous_blocking, term_blocking = extract_blockings()
 
 # Create timetables and get stats
 timetables, fulfilled_requests = create_timetables(all_schedule_requests, sequencing)
@@ -210,3 +226,4 @@ export_timetables_to_excel(timetables)
 # Prints the stats
 print(f"Total schedule requests: {len(all_schedule_requests)}")
 print(f"Fulfilled schedule requests: {fulfilled_requests}")
+
