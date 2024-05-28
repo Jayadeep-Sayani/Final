@@ -129,9 +129,9 @@ def create_timetables(schedule_requests):
         random.shuffle(main_courses)
 
         for course in schedule.requested_main_courses:
-            if course.course_id not in course_ids.keys():
+            print(course.course_id)
+            if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
-                print(schedule.requested_main_courses)
 
         schedule.finalized_schedule = [course.name for course in main_courses]
 
@@ -169,9 +169,10 @@ def score_master_timetable(master_timetable, sequencing_rules):
 
         # Check each sequencing rule
         for prereq, subseq in sequencing_rules:
-            if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
-                # Penalize if the prerequisite is scheduled after the subsequent course
-                score += 1
+            if prereq in course_ids.keys() and subseq in course_ids.keys():
+                if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
+                    # Penalize if the prerequisite is scheduled after the subsequent course
+                    score += 1
     return score
 
 
@@ -188,7 +189,6 @@ if __name__ == "__main__":
             if line[18] == 'Y' or line[18] == 'N':
                 course_ids[line[0]] = line[3]
     
-    print(course_ids)
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
