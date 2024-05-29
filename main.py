@@ -171,8 +171,10 @@ def score_master_timetable(master_timetable, sequencing_rules):
         for prereq, subseq in sequencing_rules:
             if prereq in course_ids.keys() and subseq in course_ids.keys():
                 if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
-                    # Penalize if the prerequisite is scheduled after the subsequent course
-                    score += 1
+                    # Reward if the prerequisite is scheduled before the subsequent course
+                    score += 10
+                elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
+                    score -= 10
     return score
 
 
@@ -187,14 +189,14 @@ if __name__ == "__main__":
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == 'Y' or line[18] == 'N':
-                course_ids[line[0]] = line[3]
+                course_ids[line[0]] = line[2]
     
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
 
     for schedule in schedule_requests:
-        while len(schedule.requested_main_courses) < 9:
+        while len(schedule.requested_main_courses) < 8:
             schedule.requested_main_courses.append(Course("", "", False, False, False))
 
 
@@ -219,12 +221,22 @@ if __name__ == "__main__":
 
     while True:
         possible_master_timetables = generate_possible_master_timetables(newbest_master_timetable)
+        same_score_master_timetables = []
+        found_new_best = False
         for master_timetable in possible_master_timetables:
-            score = score_master_timetable(master_timetable, sequencing) 
+            score = score_master_timetable(master_timetable, sequencing)     
             if score > currscore:
                 newbest_score = score
                 newbest_master_timetable = master_timetable
+                found_new_best = True
                 break
+            elif score == currscore:
+                same_score_master_timetables.append(master_timetable)
+                
+        if found_new_best == False:
+            newbest_master_timetable = random.choice(same_score_master_timetables)
+            newbest_score = score_master_timetable(newbest_master_timetable, sequencing)
+
         print(newbest_score)
 
         # Update visited states with the new best timetable
