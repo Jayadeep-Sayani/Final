@@ -117,6 +117,19 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
                         sequences.append((prereq, subseq))
     return sequences
 
+def extract_sections(file_path='data/Course Information.csv'):
+    sections = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+        
+        for line in csv_reader:
+            if line[18] == "Y" or line[18] == "N":
+                sections[line[0]] = (int)(line[14])
+
+    print(sections)
+
+    return sections
 
 
 def create_timetables(schedule_requests):
@@ -194,6 +207,7 @@ if __name__ == "__main__":
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
+    sections = extract_sections()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
@@ -240,6 +254,7 @@ if __name__ == "__main__":
         print(newbest_score)
 
         # Update visited states with the new best timetable
+        
         update_visited_states(newbest_master_timetable, newbest_score)
 
         export_timetables_to_excel(newbest_master_timetable, 'timetables.xlsx')
