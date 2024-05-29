@@ -121,9 +121,8 @@ def extract_sections(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
-                sections[line[0]] = (int)(line[14])
+                sections[line[2]] = int(line[14])
 
-    print(sections)
 
     return sections
 
@@ -195,9 +194,12 @@ def score_master_timetable(master_timetable, sequencing_rules):
         # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
 
-        
+        # # Iterate over the items in dict_1
+        for key in course_counts:
+            if key in course_ids.values():
+                if sections[key] < course_counts[key]:
+                    score -= 30
 
-        print(course_counts)
     return score
 
 
@@ -205,22 +207,18 @@ def count_strings_in_columns(array):
     # Initialize an empty dictionary to store counts
     string_count = {}
     
-    # Get the number of columns
-    num_columns = len(array[0])
-    
-    # Iterate through each column
-    for col_idx in range(num_columns):
-        # Use a set to store unique strings in the current column
-        unique_strings = set(row[col_idx] for row in array)
-        
-        # Update the dictionary with counts
-        for string in unique_strings:
-            if string in string_count:
-                string_count[string] += 1
-            else:
-                string_count[string] = 1
+    # Iterate through each row
+    for row in array:
+        # Iterate through each element in the row
+        for col_idx, element in enumerate(row):
+            if element != '':
+                if element in string_count:
+                    string_count[element] += 1
+                else:
+                    string_count[element] = 1
     
     return string_count
+
 
 
 
