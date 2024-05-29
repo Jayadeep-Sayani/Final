@@ -125,12 +125,39 @@ def extract_sections(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
-                sections[line[0]] = (int)(line[14])
+                sections[line[1]] = (int)(line[14])
 
-    print(sections)
+    #print(sections)
 
     return sections
 
+def extract_maxEnrollment(file_path='data/Course Information.csv'):
+    maxEnrollment = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+        
+        for line in csv_reader:
+            if line[18] == "Y" or line[18] == "N":
+                maxEnrollment[line[1]] = (int)(line[9])
+
+    #print(maxEnrollment)
+
+    return maxEnrollment
+
+def extract_blockings(file_path='data/Course Information.csv'):
+    blockings = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+        
+        for line in csv_reader:
+            if line[2].startswith("Schedule"):
+                blockings[line[2].split(",")[0].str[9:]] = line[2].split(", ")[1].str[:10]
+
+    print(blockings)
+
+    return blockings
 
 def create_timetables(schedule_requests):
     numcurr = 1000
@@ -208,6 +235,7 @@ if __name__ == "__main__":
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
     sections = extract_sections()
+    maxEnrollment = extract_maxEnrollment()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
