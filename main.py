@@ -1,14 +1,10 @@
 import csv
+import numpy as np
 import pandas as pd
 import random
 from itertools import combinations
 
-
 course_ids = {}
-
-
-
-
  
 def export_timetables_to_excel(timetables, file_path):
     data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
@@ -159,9 +155,10 @@ def extract_blockings(file_path='data/Course Information.csv'):
 
     return blockings
 
-def create_timetables(schedule_requests):
+def create_timetables(schedule_requests, sequencing):
     numcurr = 1000
     for schedule in schedule_requests:
+        
         numcurr = numcurr + 1
         # Get the requested main courses for this person
         main_courses = schedule.requested_main_courses
@@ -169,13 +166,47 @@ def create_timetables(schedule_requests):
         random.shuffle(main_courses)
 
         for course in schedule.requested_main_courses:
-            print(course.course_id)
             if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
 
-        schedule.finalized_schedule = [course.name for course in main_courses]
+        # Check if the schedule request has both a prerequisite and a subsequent
+        for seq_pair in sequencing:
+            course_id_1, course_id_2 = seq_pair
+            prereq = None
+            subseq = None
 
+            # Finds the prereq and subseq
+            for course in schedule.requested_main_courses:
+                if course.course_id == course_id_1:
+                    prereq = course
+                if course.course_id == course_id_2:
+                    subseq = course
+            
+            # Adds the prerequisite to semester 1 and subsequent to semester 2
+            if prereq is not None and subseq is not None and prereq not in schedule.finalized_schedule[:4] and subseq not in schedule.finalized_schedule[4:]:
+                for course in schedule.finalized_schedule[:4]:
+                    if course is "":
+                        course = prereq
+                for course in schedule.finalized_schedule[4:]:
+                    if course is "":
+                        course = subseq
 
+        # Check for linear course and add to both semesters
+        for course in schedule.requested_main_courses:
+            if course.linear and course not in schedule.finalized_schedule:
+                for sem1course in schedule.finalized_schedule[:4]:
+                    if sem1course is "":
+                        sem1course = course
+                for sem2course in schedule.finalized_schedule[4:]:
+                    if sem2course is "":
+                        sem2course = course
+        
+        # Add remaining courses
+        for course in schedule.requested_main_courses:
+            if course not in schedule.finalized_schedule:
+                for course_space in schedule.finalized_schedule:
+                    if course_space is "":
+                        course_space = course
 
 # Define a global variable to store visited states
 visited_states = {}
@@ -215,7 +246,45 @@ def score_master_timetable(master_timetable, sequencing_rules):
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
+        
+        for course in person_schedule:
+            if "linear" in course.lower():
+                if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
+                    score -= 20
+                elif course in first_half and course in second_half:
+                    score += 20
+        
+
+        # Initialize an empty dictionary to store the counts
+        course_counts = count_strings_in_columns(master_timetable)
+
+        
+
+        print(course_counts)
     return score
+
+
+def count_strings_in_columns(array):
+    # Initialize an empty dictionary to store counts
+    string_count = {}
+    
+    # Get the number of columns
+    num_columns = len(array[0])
+    
+    # Iterate through each column
+    for col_idx in range(num_columns):
+        # Use a set to store unique strings in the current column
+        unique_strings = set(row[col_idx] for row in array)
+        
+        # Update the dictionary with counts
+        for string in unique_strings:
+            if string in string_count:
+                string_count[string] += 1
+            else:
+                string_count[string] = 1
+    
+    return string_count
+
 
 
 def update_visited_states(master_timetable, score):
@@ -223,14 +292,12 @@ def update_visited_states(master_timetable, score):
     visited_states[key] = score
 
 if __name__ == "__main__":
-
     
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == 'Y' or line[18] == 'N':
-                course_ids[line[0]] = line[2]
-    
+                course_ids[line[0]] = line[2]    
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
