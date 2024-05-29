@@ -1,14 +1,10 @@
 import csv
+import numpy as np
 import pandas as pd
 import random
 from itertools import combinations
 
-
 course_ids = {}
-
-
-
-
  
 def export_timetables_to_excel(timetables, file_path):
     data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
@@ -129,7 +125,6 @@ def create_timetables(schedule_requests):
         random.shuffle(main_courses)
 
         for course in schedule.requested_main_courses:
-            print(course.course_id)
             if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
 
@@ -175,7 +170,45 @@ def score_master_timetable(master_timetable, sequencing_rules):
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
+        
+        for course in person_schedule:
+            if "linear" in course.lower():
+                if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
+                    score -= 20
+                elif course in first_half and course in second_half:
+                    score += 20
+        
+
+        # Initialize an empty dictionary to store the counts
+        course_counts = count_strings_in_columns(master_timetable)
+
+        
+
+        print(course_counts)
     return score
+
+
+def count_strings_in_columns(array):
+    # Initialize an empty dictionary to store counts
+    string_count = {}
+    
+    # Get the number of columns
+    num_columns = len(array[0])
+    
+    # Iterate through each column
+    for col_idx in range(num_columns):
+        # Use a set to store unique strings in the current column
+        unique_strings = set(row[col_idx] for row in array)
+        
+        # Update the dictionary with counts
+        for string in unique_strings:
+            if string in string_count:
+                string_count[string] += 1
+            else:
+                string_count[string] = 1
+    
+    return string_count
+
 
 
 def update_visited_states(master_timetable, score):
@@ -183,14 +216,12 @@ def update_visited_states(master_timetable, score):
     visited_states[key] = score
 
 if __name__ == "__main__":
-
     
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == 'Y' or line[18] == 'N':
-                course_ids[line[0]] = line[2]
-    
+                course_ids[line[0]] = line[2]    
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
