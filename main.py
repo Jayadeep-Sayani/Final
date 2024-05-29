@@ -128,9 +128,10 @@ def extract_sections(file_path='data/Course Information.csv'):
     return sections
 
 
-def create_timetables(schedule_requests):
+def create_timetables(schedule_requests, sequencing):
     numcurr = 1000
     for schedule in schedule_requests:
+        
         numcurr = numcurr + 1
         # Get the requested main courses for this person
         main_courses = schedule.requested_main_courses
@@ -141,9 +142,44 @@ def create_timetables(schedule_requests):
             if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
 
-        schedule.finalized_schedule = [course.name for course in main_courses]
+        # Check if the schedule request has both a prerequisite and a subsequent
+        for seq_pair in sequencing:
+            course_id_1, course_id_2 = seq_pair
+            prereq = None
+            subseq = None
 
+            # Finds the prereq and subseq
+            for course in schedule.requested_main_courses:
+                if course.course_id == course_id_1:
+                    prereq = course
+                if course.course_id == course_id_2:
+                    subseq = course
+            
+            # Adds the prerequisite to semester 1 and subsequent to semester 2
+            if prereq is not None and subseq is not None and prereq not in schedule.finalized_schedule[:4] and subseq not in schedule.finalized_schedule[4:]:
+                for course in schedule.finalized_schedule[:4]:
+                    if course is "":
+                        course = prereq
+                for course in schedule.finalized_schedule[4:]:
+                    if course is "":
+                        course = subseq
 
+        # Check for linear course and add to both semesters
+        for course in schedule.requested_main_courses:
+            if course.linear and course not in schedule.finalized_schedule:
+                for sem1course in schedule.finalized_schedule[:4]:
+                    if sem1course is "":
+                        sem1course = course
+                for sem2course in schedule.finalized_schedule[4:]:
+                    if sem2course is "":
+                        sem2course = course
+        
+        # Add remaining courses
+        for course in schedule.requested_main_courses:
+            if course not in schedule.finalized_schedule:
+                for course_space in schedule.finalized_schedule:
+                    if course_space is "":
+                        course_space = course
 
 # Define a global variable to store visited states
 visited_states = {}
