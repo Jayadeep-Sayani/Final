@@ -2,30 +2,12 @@ import csv
 import pandas as pd
 import random
 from itertools import combinations
-
+import math
+from multiprocessing import Pool
 
 course_ids = {}
-
-
-
-
- 
-def export_timetables_to_excel(timetables, file_path):
-    data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
-
-    for timetable in timetables:
-        data['S1A'].append(timetable[0] if len(timetable) > 0 else '')
-        data['S1B'].append(timetable[1] if len(timetable) > 1 else '')
-        data['S1C'].append(timetable[2] if len(timetable) > 2 else '')
-        data['S1D'].append(timetable[3] if len(timetable) > 3 else '')
-        data['S2A'].append(timetable[4] if len(timetable) > 4 else '')
-        data['S2B'].append(timetable[5] if len(timetable) > 5 else '')
-        data['S2C'].append(timetable[6] if len(timetable) > 6 else '')
-        data['S2D'].append(timetable[7] if len(timetable) > 7 else '')
-
-    df = pd.DataFrame(data)
-    df.to_excel(file_path, index=False)
-
+memoized_scores = {}
+visited_states = {}
 
 outside_timetables = [
     'XC---09--L', 'MDNC-09C-L', 'MDNC-09M-L', 'XBA--09J-L', 'XLDCB09S-L', 'YCPA-0AX-L',
@@ -40,6 +22,7 @@ outside_timetables = [
 unknown_courses = ['YESFL1AX--', 'MEFWR10---', 'XLEAD09---', 'MGE--11', 'MGE--12', 'MKOR-10---', 'MKOR-11---', 'MKOR-12---', 'MIT--12---', 'MSPLG11---', 'MJA--10---', 'MJA--11---', 'MJA--12---', 'MLTST10---', 'MLTST10--L']
 
 
+
 class Course:
     def __init__(self, name, course_id_, alt, outside, linear):
         self.name = name
@@ -48,14 +31,13 @@ class Course:
         self.outside = outside
         self.linear = linear
 
-
 class Person:
     def __init__(self):
         self.requested_main_courses = []
         self.requested_alternative_courses = []
         self.requested_courses = []
         self.requested_outsides = []
-        self.finalized_schedule = ["", "", "", "", "", "", "", ""]  # New attribute
+        self.finalized_schedule = ["", "", "", "", "", "", "", ""]
 
     def add_course(self, course):
         if course.outside:
@@ -75,7 +57,6 @@ class Person:
 
     def add_to_finalized_schedule(self, course):
         self.finalized_schedule.append(course)
-
 
 def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
     schedules = []
@@ -101,8 +82,6 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
 
     return schedules
 
-
-# Gets sequencing rules from csv file
 def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
     sequences = []
     with open(file_path, mode='r', encoding='utf-8') as file:
@@ -117,34 +96,23 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
                         sequences.append((prereq, subseq))
     return sequences
 
-
-
 def create_timetables(schedule_requests):
     numcurr = 1000
     for schedule in schedule_requests:
         numcurr = numcurr + 1
-        # Get the requested main courses for this person
         main_courses = schedule.requested_main_courses
-        # Shuffle the main courses randomly
         random.shuffle(main_courses)
 
         for course in schedule.requested_main_courses:
-            print(course.course_id)
             if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
 
         schedule.finalized_schedule = [course.name for course in main_courses]
 
-
-
-# Define a global variable to store visited states
-visited_states = {}
-
 def generate_possible_master_timetables(master_timetable):
     possible_master_timetables = []
 
     for person_index, person_timetable in enumerate(master_timetable):
-        # Generate all possible swaps for this person's timetable
         for swap_combination in combinations(range(len(person_timetable)), 2):
             new_master_timetable = [row.copy() for row in master_timetable]
             new_master_timetable[person_index][swap_combination[0]], new_master_timetable[person_index][swap_combination[1]] = \
@@ -154,43 +122,76 @@ def generate_possible_master_timetables(master_timetable):
             if key not in visited_states:
                 possible_master_timetables.append(new_master_timetable)
 
-    
     return possible_master_timetables
 
-
 def score_master_timetable(master_timetable, sequencing_rules):
-    score = 0
+    key = tuple(tuple(row) for row in master_timetable)
+    if key in memoized_scores:
+        return memoized_scores[key]
 
-    # Check sequencing for each pair of courses in the master timetable
+    score = 0
     for person_schedule in master_timetable:
-        # Extract the first 4 and last 4 courses from the person's schedule
         first_half = person_schedule[:4]
         second_half = person_schedule[4:]
 
-        # Check each sequencing rule
         for prereq, subseq in sequencing_rules:
             if prereq in course_ids.keys() and subseq in course_ids.keys():
                 if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
-                    # Reward if the prerequisite is scheduled before the subsequent course
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
-    return score
 
+    memoized_scores[key] = score
+    return score
 
 def update_visited_states(master_timetable, score):
     key = tuple(tuple(row) for row in master_timetable)
     visited_states[key] = score
 
-if __name__ == "__main__":
+def export_timetables_to_excel(timetables, file_path):
+    data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
+    for timetable in timetables:
+        data['S1A'].append(timetable[0] if len(timetable) > 0 else '')
+        data['S1B'].append(timetable[1] if len(timetable) > 1 else '')
+        data['S1C'].append(timetable[2] if len(timetable) > 2 else '')
+        data['S1D'].append(timetable[3] if len(timetable) > 3 else '')
+        data['S2A'].append(timetable[4] if len(timetable) > 4 else '')
+        data['S2B'].append(timetable[5] if len(timetable) > 5 else '')
+        data['S2C'].append(timetable[6] if len(timetable) > 6 else '')
+        data['S2D'].append(timetable[7] if len(timetable) > 7 else '')
 
-    
+    df = pd.DataFrame(data)
+    df.to_excel(file_path, index=False)
+
+def simulated_annealing(initial_timetable, sequencing_rules, initial_temp, cooling_rate):
+    current_timetable = initial_timetable
+    current_score = score_master_timetable(current_timetable, sequencing_rules)
+    best_timetable = current_timetable
+    best_score = current_score
+    temperature = initial_temp
+
+    while temperature > 1:
+        new_timetable = generate_possible_master_timetables(current_timetable)[0]  # Get one new possible timetable
+        new_score = score_master_timetable(new_timetable, sequencing_rules)
+
+        if new_score > current_score or math.exp((new_score - current_score) / temperature) > random.random():
+            current_timetable = new_timetable
+            current_score = new_score
+
+            if new_score > best_score:
+                best_timetable = new_timetable
+                best_score = new_score
+
+        temperature *= cooling_rate
+
+    return best_timetable, best_score
+
+if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == 'Y' or line[18] == 'N':
                 course_ids[line[0]] = line[2]
-    
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
@@ -199,50 +200,14 @@ if __name__ == "__main__":
         while len(schedule.requested_main_courses) < 8:
             schedule.requested_main_courses.append(Course("", "", False, False, False))
 
-
-    # Create timetables for each person
     create_timetables(schedule_requests)
 
-    # Create master timetable
-    master_timetable = []
+    master_timetable = [schedule.finalized_schedule for schedule in schedule_requests]
 
-    # Iterate over each person's schedule and append to master timetable
-    for schedule in schedule_requests:
-        master_timetable.append(schedule.finalized_schedule)
-     
+    initial_temp = 10000
+    cooling_rate = 0.99
 
-    currscore = score_master_timetable(master_timetable, sequencing)
-    update_visited_states(master_timetable, currscore)
-
-    print(currscore)
-
-    newbest_score = currscore
-    newbest_master_timetable = master_timetable
-
-    while True:
-        possible_master_timetables = generate_possible_master_timetables(newbest_master_timetable)
-        same_score_master_timetables = []
-        found_new_best = False
-        for master_timetable in possible_master_timetables:
-            score = score_master_timetable(master_timetable, sequencing)     
-            if score > currscore:
-                newbest_score = score
-                newbest_master_timetable = master_timetable
-                found_new_best = True
-                break
-            elif score == currscore:
-                same_score_master_timetables.append(master_timetable)
-                
-        if found_new_best == False:
-            newbest_master_timetable = random.choice(same_score_master_timetables)
-            newbest_score = score_master_timetable(newbest_master_timetable, sequencing)
-
-        print(newbest_score)
-
-        # Update visited states with the new best timetable
-        update_visited_states(newbest_master_timetable, newbest_score)
-
-        export_timetables_to_excel(newbest_master_timetable, 'timetables.xlsx')
-
-
-
+    best_timetable, best_score = simulated_annealing(master_timetable, sequencing, initial_temp, cooling_rate)
+    
+    print(f"Best score: {best_score}")
+    export_timetables_to_excel(best_timetable, 'timetables.xlsx')
