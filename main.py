@@ -157,6 +157,7 @@ def extract_blockings(file_path='data/Course Information.csv'):
 
 def create_timetables(schedule_requests, sequencing):
     numcurr = 1000
+    timetable = []
     for schedule in schedule_requests:
         
         numcurr = numcurr + 1
@@ -165,9 +166,9 @@ def create_timetables(schedule_requests, sequencing):
         # Shuffle the main courses randomly
         random.shuffle(main_courses)
 
-        for course in schedule.requested_main_courses:
+        for course in main_courses:
             if course.course_id not in course_ids.keys() and course.course_id != '':
-                schedule.requested_main_courses.remove(course)
+                main_courses.remove(course)
 
         # Check if the schedule request has both a prerequisite and a subsequent
         for seq_pair in sequencing:
@@ -176,7 +177,7 @@ def create_timetables(schedule_requests, sequencing):
             subseq = None
 
             # Finds the prereq and subseq
-            for course in schedule.requested_main_courses:
+            for course in main_courses:
                 if course.course_id == course_id_1:
                     prereq = course
                 if course.course_id == course_id_2:
@@ -184,29 +185,33 @@ def create_timetables(schedule_requests, sequencing):
             
             # Adds the prerequisite to semester 1 and subsequent to semester 2
             if prereq is not None and subseq is not None and prereq not in schedule.finalized_schedule[:4] and subseq not in schedule.finalized_schedule[4:]:
-                for course in schedule.finalized_schedule[:4]:
-                    if course is "":
-                        course = prereq
-                for course in schedule.finalized_schedule[4:]:
-                    if course is "":
+                for i in range(4):
+                    if not schedule.finalized_schedule[i]:
+                        schedule.finalized_schedule[i] = prereq
+                for i in range(4):
+                    if not schedule.finalized_schedule[i + 4]:
                         course = subseq
 
         # Check for linear course and add to both semesters
-        for course in schedule.requested_main_courses:
+        for course in main_courses:
             if course.linear and course not in schedule.finalized_schedule:
-                for sem1course in schedule.finalized_schedule[:4]:
-                    if sem1course is "":
-                        sem1course = course
-                for sem2course in schedule.finalized_schedule[4:]:
-                    if sem2course is "":
-                        sem2course = course
+                for i in range(4):
+                    if not schedule.finalized_schedule[i]:
+                        schedule.finalized_schedule[i] = course
+                for i in range(4):
+                    if not schedule.finalized_schedule[i + 4]:
+                        schedule.finalized_schedule[i + 4] = course
         
         # Add remaining courses
-        for course in schedule.requested_main_courses:
+        for course in main_courses:
             if course not in schedule.finalized_schedule:
-                for course_space in schedule.finalized_schedule:
-                    if course_space is "":
-                        course_space = course
+                for i in range(8):
+                    if not schedule.finalized_schedule[i]:
+                        schedule.finalized_schedule[i] = course
+
+        timetable.append(schedule.finalized_schedule)
+        print(schedule.finalized_schedule)
+    return timetable, numcurr
 
 # Define a global variable to store visited states
 visited_states = {}
@@ -224,7 +229,6 @@ def generate_possible_master_timetables(master_timetable):
             key = tuple(tuple(row) for row in new_master_timetable)
             if key not in visited_states:
                 possible_master_timetables.append(new_master_timetable)
-
     
     return possible_master_timetables
 
@@ -246,7 +250,7 @@ def score_master_timetable(master_timetable, sequencing_rules):
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
-        
+        """
         for course in person_schedule:
             if "linear" in course.lower():
                 if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
@@ -254,11 +258,9 @@ def score_master_timetable(master_timetable, sequencing_rules):
                 elif course in first_half and course in second_half:
                     score += 20
         
-
+        """
         # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
-
-        
 
         print(course_counts)
     return score
@@ -310,7 +312,7 @@ if __name__ == "__main__":
 
 
     # Create timetables for each person
-    create_timetables(schedule_requests)
+    create_timetables(schedule_requests, sequencing)
 
     # Create master timetable
     master_timetable = []
