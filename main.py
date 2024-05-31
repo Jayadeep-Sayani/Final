@@ -188,6 +188,59 @@ def create_timetables(schedule_requests, sequencing):
     return timetables, fulfilled_eight_percentage, fulfilled_seven_or_eight_percentage
 
 
+def create_real_master_timetable(timetables, max_enrolement):
+    data = [{}, {}, {}, {}, {}, {}, {}, {}]
+
+    for i in range(len(data)):
+        for timetable in timetables:
+            courses = timetable.semester_1 + timetable.semester_2
+            if i < len(courses):
+                if courses[i].name in data[i]:
+                    print(courses[i].name)
+                    if data[i][courses[i].name][-1] is max_enrolement[courses[i].name]:
+                        data[i][courses[i].name].append(1)
+                    else:
+                        data[i][courses[i].name][-1] += 1
+                else:
+                    data[i][courses[i].name] = []
+                    data[i][courses[i].name].append(0)
+
+    data2 = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
+
+    for key in data[0]:
+        for int in data[0][key]:
+            data2['S1A'].append(key)
+    
+    for key in data[1]:
+        for int in data[1][key]:
+            data2['S1B'].append(key)
+    
+    for key in data[2]:
+        for int in data[2][key]:
+            data2['S1C'].append(key)
+
+    for key in data[3]:
+        for int in data[3][key]:
+            data2['S1D'].append(key)
+    
+    for key in data[4]:
+        for int in data[4][key]:
+            data2['S2A'].append(key)
+    
+    for key in data[5]:
+        for int in data[5][key]:
+            data2['S2B'].append(key)
+
+    for key in data[6]:
+        for int in data[6][key]:
+            data2['S2C'].append(key)
+
+    for key in data[7]:
+        for int in data[7][key]:
+            data2['S1D'].append(key)
+    df = pd.DataFrame(data2)
+    df.to_excel('timetables.xlsx', index=False)
+
 # Exports the master timetable to an excel file
 def export_timetables_to_excel(timetables):
     data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
@@ -236,9 +289,20 @@ def extract_blockings(file_path='Course Blocking Rules.csv'):
             blocking_rule = line[2].split(" in a ")[0][9:].split(", ")
             if len(blocking_rule) != 1 and blocking_rule[0] != '':
                 blockings.append(blocking_rule)
-    print(blockings)
+    #print(blockings)
     return blockings
 
+def extract_maxEnrollment(file_path='Course Information.csv'):
+    maxEnrollment = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+        
+        for line in csv_reader:
+            if line[18] == "Y" or line[18] == "N":
+                maxEnrollment[line[2]] = (int)(line[9])
+
+    return maxEnrollment
 
 # Main 
 #----------------------------
@@ -247,6 +311,7 @@ def extract_blockings(file_path='Course Blocking Rules.csv'):
 all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
 blockings = extract_blockings()
+maxEnrollment = extract_maxEnrollment()
 
 # Create timetables and get stats
 timetables, eight, seven_or_eight = create_timetables(all_schedule_requests, sequencing)
@@ -256,7 +321,6 @@ print(f"Percentage of people who got all 8 requested main courses: {eight:.2f}%"
 print(f"Percentage of people who got 7-8 requested main courses: {seven_or_eight:.2f}%")
 
 
-
-export_timetables_to_excel(timetables)
+create_real_master_timetable(timetables, maxEnrollment)
 
 
