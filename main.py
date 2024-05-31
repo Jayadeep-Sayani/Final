@@ -123,6 +123,7 @@ def extract_schedules():
 def create_timetables(schedule_requests, sequencing):
     timetables = []
     fulfilled_requests = 0
+    all_main_courses = 0
     
     for schedule_request in schedule_requests:
         fully_scheduled_count = 0
@@ -152,27 +153,39 @@ def create_timetables(schedule_requests, sequencing):
             if prereq is not None and subseq is not None and prereq not in timetable.semester_1 and subseq not in timetable.semester_2:
                 timetable.add_course(prereq, 1)
                 timetable.add_course(subseq, 2)
+                all_main_courses += 2
 
         # Adds in the rest of the courses
         for course in courses:
             if course not in timetable.semester_1 and course not in timetable.semester_2:
+                all_main_courses += 1
                 if len(timetable.semester_1) < 4:
                     timetable.add_course(course, 1)
                 elif len(timetable.semester_2) < 4:
                     timetable.add_course(course, 2) 
 
-        timetables.append(timetable)  # Add the completed timetable to the list
+    total_main_courses = 0
+    for schedule_request in schedule_requests:
+        total_main_courses += len(schedule_request.get_course_requests())
 
-    # Check if all 8 requested courses were scheduled
-        if len(timetable.semester_1) == 4 and len(timetable.semester_2) == 4 and len(schedule_request.get_course_requests()) == 8:
+
+
+        if len(timetable.semester_1) == 4 and len(timetable.semester_2) == 4 and len(schedule_request.main_courses) == 8:
             fully_scheduled_count += 1
-
+        
         if (len(timetable.semester_1) + len(timetable.semester_2)) > 6 and len(schedule_request.get_course_requests()) > 6:
             seven_or_eight_scheuled_count += 1
+    
+        
+
+        
+        
+        timetables.append(timetable)  # Add the completed timetable to the list
 
     total_eight_main_course_requests = 0
     total_main_requests = 0
     total_seven_or_eight_course_requests = 0
+
     for schedule_request in schedule_requests:
 
 
@@ -184,8 +197,8 @@ def create_timetables(schedule_requests, sequencing):
 
     fulfilled_eight_percentage = (total_eight_main_course_requests / fully_scheduled_count) * 100
     fulfilled_seven_or_eight_percentage = (total_seven_or_eight_course_requests / seven_or_eight_scheuled_count) * 100
-
-    return timetables, fulfilled_eight_percentage, fulfilled_seven_or_eight_percentage
+    fulfilled_main_percentage = (all_main_courses / total_main_courses) * 100
+    return timetables, fulfilled_eight_percentage, fulfilled_seven_or_eight_percentage, fulfilled_main_percentage
 
 
 # Exports the master timetable to an excel file
@@ -249,11 +262,13 @@ sequencing = extract_sequencing()
 blockings = extract_blockings()
 
 # Create timetables and get stats
-timetables, eight, seven_or_eight = create_timetables(all_schedule_requests, sequencing)
+timetables, eight, seven_or_eight, mainper = create_timetables(all_schedule_requests, sequencing)
 
 # Print the percentage of people who got all 8 requested main courses
-print(f"Percentage of people who got all 8 requested main courses: {eight:.2f}%")
-print(f"Percentage of people who got 7-8 requested main courses: {seven_or_eight:.2f}%")
+print(f"Percentage of people who got all 8 requested main courses: {eight:.1f}%")
+print(f"Percentage of people who got 7-8 requested main courses: {seven_or_eight:.1f}%")
+print(f"Percentage of main courses given: {mainper:.1f}%")
+
 
 
 
