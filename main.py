@@ -149,7 +149,8 @@ def extract_blockings(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[2].startswith("Schedule"):
-                blockings[line[2].split(",")[0].str[9:]] = line[2].split(", ")[1].str[:10]
+                blockings[line[2].split(",")[0].str[9:]] = (line[2].split(", ")[1].str[:10], line[2].split("in a "))
+                blockings[line[2].split(", ")[1].str[:10]] = (line[2].split(",")[0].str[9:], line[2].split("in a "))
 
     print(blockings)
 
