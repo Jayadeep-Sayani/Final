@@ -135,13 +135,13 @@ def extract_maxEnrollment(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[9])
+                maxEnrollment[line[2]] = (int)(line[9])
 
-    #print(maxEnrollment)
+    print(maxEnrollment)
 
     return maxEnrollment
 
-def extract_blockings(file_path='data/Course Information.csv'):
+def extract_blockings(file_path='data/Course Blocking Rules.csv'):
     blockings = {}
 
     with open(file_path, mode='r', encoding='utf-8') as file:
@@ -149,10 +149,11 @@ def extract_blockings(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[2].startswith("Schedule"):
-                blockings[line[2].split(",")[0].str[9:]] = (line[2].split(", ")[1].str[:10], line[2].split("in a "))
-                blockings[line[2].split(", ")[1].str[:10]] = (line[2].split(",")[0].str[9:], line[2].split("in a "))
 
-    print(blockings)
+                blockings[line[2].split(",")[0][9:]] = (line[2].split(", ")[1][:10], line[2].split("in a ")[1][:len(line[2].split("in a ")[1])])
+                blockings[line[2].split(", ")[1][:10]] = (line[2].split(",")[0][9:], line[2].split("in a ")[1][:len(line[2].split("in a ")[1])])
+
+    #print(blockings)
 
     return blockings
 
@@ -211,7 +212,7 @@ def create_timetables(schedule_requests, sequencing):
                         schedule.finalized_schedule[i] = course
 
         timetable.append(schedule.finalized_schedule)
-        print(schedule.finalized_schedule)
+        #print(schedule.finalized_schedule)
     return timetable, numcurr
 
 # Define a global variable to store visited states
@@ -263,7 +264,7 @@ def score_master_timetable(master_timetable, sequencing_rules):
         # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
 
-        print(course_counts)
+        #print(course_counts)
     return score
 
 
@@ -306,6 +307,7 @@ if __name__ == "__main__":
     sequencing = extract_sequencing()
     sections = extract_sections()
     maxEnrollment = extract_maxEnrollment()
+    blockings = extract_blockings()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
