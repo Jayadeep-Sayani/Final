@@ -126,37 +126,9 @@ def extract_sections(file_path='data/Course Information.csv'):
 
     return sections
 
-def extract_maxEnrollment(file_path='data/Course Information.csv'):
-    maxEnrollment = {}
 
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        
-        for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[9])
-
-    #print(maxEnrollment)
-
-    return maxEnrollment
-
-def extract_blockings(file_path='data/Course Information.csv'):
-    blockings = {}
-
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        
-        for line in csv_reader:
-            if line[2].startswith("Schedule"):
-                blockings[line[2].split(",")[0].str[9:]] = line[2].split(", ")[1].str[:10]
-
-    print(blockings)
-
-    return blockings
-
-def create_timetables(schedule_requests, sequencing):
+def create_timetables(schedule_requests):
     numcurr = 1000
-    timetable = []
     for schedule in schedule_requests:
         numcurr = numcurr + 1
         # Get the requested main courses for this person
@@ -164,48 +136,26 @@ def create_timetables(schedule_requests, sequencing):
         # Shuffle the main courses randomly
         random.shuffle(main_courses)
 
-        for course in main_courses:
+        for course in schedule.requested_main_courses:
             if course.course_id not in course_ids.keys() and course.course_id != '':
-                main_courses.remove(course)
+                schedule.requested_main_courses.remove(course)
 
-        # Check if the schedule request has both a prerequisite and a subsequent
-        for seq_pair in sequencing:
-            course_id_1, course_id_2 = seq_pair
-            prereq = None
-            subseq = None
+        schedule.finalized_schedule = [course.name for course in main_courses]
 
-            # Finds the prereq and subseq
-            for course in schedule.requested_main_courses:
-                if course.course_id == course_id_1:
-                    prereq = course
-                if course.course_id == course_id_2:
-                    subseq = course
-            
-            # Adds the prerequisite to semester 1 and subsequent to semester 2
-            if prereq is not None and subseq is not None and prereq not in schedule.finalized_schedule[:4] and subseq not in schedule.finalized_schedule[4:]:
-                for course in schedule.finalized_schedule[:4]:
-                    if course is "":
-                        course = prereq
-                for course in schedule.finalized_schedule[4:]:
-                    if course is "":
-                        course = subseq
+def extract_sections(file_path='data/Course Information.csv'):
+    sections = {}
 
-        # Check for linear course and add to both semesters
-        for course in schedule.requested_main_courses:
-            if course.linear and course not in schedule.finalized_schedule:
-                for sem1course in schedule.finalized_schedule[:4]:
-                    if sem1course is "":
-                        sem1course = course
-                for sem2course in schedule.finalized_schedule[4:]:
-                    if sem2course is "":
-                        sem2course = course
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
         
-        # Add remaining courses
-        for course in schedule.requested_main_courses:
-            if course not in schedule.finalized_schedule:
-                for course_space in schedule.finalized_schedule:
-                    if course_space is "":
-                        course_space = course
+        for line in csv_reader:
+            if line[18] == "Y" or line[18] == "N":
+                sections[line[1]] = (int)(line[14])
+
+    #print(sections)
+
+    return sections
+
 
 # Define a global variable to store visited states
 visited_states = {}
@@ -223,6 +173,7 @@ def generate_possible_master_timetables(master_timetable):
             key = tuple(tuple(row) for row in new_master_timetable)
             if key not in visited_states:
                 possible_master_timetables.append(new_master_timetable)
+
     
     return possible_master_timetables
 
@@ -245,7 +196,7 @@ def score_master_timetable(master_timetable, sequencing_rules):
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
-        """
+        
         for course in person_schedule:
             if "linear" in course.lower():
                 if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
@@ -253,13 +204,17 @@ def score_master_timetable(master_timetable, sequencing_rules):
                 elif course in first_half and course in second_half:
                     score += 20
         
-        """
+
         # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
+        max_sections = extract_sections()
 
-        
-
-        print(course_counts)
+        for course in max_sections:
+            if course_counts[course] > max_sections[course]:
+                score -= 20
+            else:
+                score += 20
+    
     return score
 
 def count_strings_in_columns(array):
@@ -300,7 +255,6 @@ if __name__ == "__main__":
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
     sections = extract_sections()
-    maxEnrollment = extract_maxEnrollment()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
@@ -308,7 +262,7 @@ if __name__ == "__main__":
 
 
     # Create timetables for each person
-    create_timetables(schedule_requests, sequencing)
+    create_timetables(schedule_requests)
 
     # Create master timetable
     master_timetable = []
