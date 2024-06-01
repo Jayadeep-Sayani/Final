@@ -121,44 +121,15 @@ def extract_sections(file_path='data/Course Information.csv'):
         
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
-                sections[line[1]] = (int)(line[14])
+                sections[line[0]] = (int)(line[14])
 
-    #print(sections)
 
     return sections
 
-def extract_maxEnrollment(file_path='data/Course Information.csv'):
-    maxEnrollment = {}
 
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        
-        for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[9])
-
-    #print(maxEnrollment)
-
-    return maxEnrollment
-
-def extract_blockings(file_path='data/Course Information.csv'):
-    blockings = {}
-
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        
-        for line in csv_reader:
-            if line[2].startswith("Schedule"):
-                blockings[line[2].split(",")[0].str[9:]] = line[2].split(", ")[1].str[:10]
-
-    print(blockings)
-
-    return blockings
-
-def create_timetables(schedule_requests, sequencing):
+def create_timetables(schedule_requests):
     numcurr = 1000
     for schedule in schedule_requests:
-        
         numcurr = numcurr + 1
         # Get the requested main courses for this person
         main_courses = schedule.requested_main_courses
@@ -169,44 +140,22 @@ def create_timetables(schedule_requests, sequencing):
             if course.course_id not in course_ids.keys() and course.course_id != '':
                 schedule.requested_main_courses.remove(course)
 
-        # Check if the schedule request has both a prerequisite and a subsequent
-        for seq_pair in sequencing:
-            course_id_1, course_id_2 = seq_pair
-            prereq = None
-            subseq = None
+        schedule.finalized_schedule = [course.name for course in main_courses]
 
-            # Finds the prereq and subseq
-            for course in schedule.requested_main_courses:
-                if course.course_id == course_id_1:
-                    prereq = course
-                if course.course_id == course_id_2:
-                    subseq = course
-            
-            # Adds the prerequisite to semester 1 and subsequent to semester 2
-            if prereq is not None and subseq is not None and prereq not in schedule.finalized_schedule[:4] and subseq not in schedule.finalized_schedule[4:]:
-                for course in schedule.finalized_schedule[:4]:
-                    if course is "":
-                        course = prereq
-                for course in schedule.finalized_schedule[4:]:
-                    if course is "":
-                        course = subseq
+def extract_sections(file_path='data/Course Information.csv'):
+    sections = {}
 
-        # Check for linear course and add to both semesters
-        for course in schedule.requested_main_courses:
-            if course.linear and course not in schedule.finalized_schedule:
-                for sem1course in schedule.finalized_schedule[:4]:
-                    if sem1course is "":
-                        sem1course = course
-                for sem2course in schedule.finalized_schedule[4:]:
-                    if sem2course is "":
-                        sem2course = course
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
         
-        # Add remaining courses
-        for course in schedule.requested_main_courses:
-            if course not in schedule.finalized_schedule:
-                for course_space in schedule.finalized_schedule:
-                    if course_space is "":
-                        course_space = course
+        for line in csv_reader:
+            if line[18] == "Y" or line[18] == "N":
+                sections[line[1]] = (int)(line[14])
+
+    #print(sections)
+
+    return sections
+
 
 # Define a global variable to store visited states
 visited_states = {}
@@ -231,6 +180,7 @@ def generate_possible_master_timetables(master_timetable):
 
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
+    master_timetable.pop(0)
 
     # Check sequencing for each pair of courses in the master timetable
     for person_schedule in master_timetable:
@@ -257,35 +207,38 @@ def score_master_timetable(master_timetable, sequencing_rules):
 
         # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
+        max_sections = extract_sections()
 
-        
-
-        print(course_counts)
+        for course in max_sections:
+            if course_counts[course] > max_sections[course]:
+                score -= 20
+            else:
+                score += 20
+    
     return score
-
 
 def count_strings_in_columns(array):
     # Initialize an empty dictionary to store counts
     string_count = {}
-    
-    # Get the number of columns
-    num_columns = len(array[0])
-    
+
+    # Determine the number of columns by finding the maximum row length
+    max_cols = max(len(row) for row in array)
+
     # Iterate through each column
-    for col_idx in range(num_columns):
-        # Use a set to store unique strings in the current column
-        unique_strings = set(row[col_idx] for row in array)
+    for col in range(max_cols):
+        unique_strings_in_column = set()
+        for row in array:
+            if col < len(row):
+                unique_strings_in_column.add(row[col])
         
-        # Update the dictionary with counts
-        for string in unique_strings:
-            if string in string_count:
-                string_count[string] += 1
-            else:
+        # Update the dictionary with the unique strings in this column
+        for string in unique_strings_in_column:
+            if string not in string_count:
                 string_count[string] = 1
-    
+            else:
+                string_count[string] += 1
+
     return string_count
-
-
 
 def update_visited_states(master_timetable, score):
     key = tuple(tuple(row) for row in master_timetable)
@@ -302,7 +255,6 @@ if __name__ == "__main__":
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
     sections = extract_sections()
-    maxEnrollment = extract_maxEnrollment()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
