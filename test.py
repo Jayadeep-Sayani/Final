@@ -2,7 +2,8 @@ import csv
 import numpy as np
 import pandas as pd
 import random
-from itertools import combinations
+import copy
+
 
 course_ids = {}
 
@@ -44,14 +45,13 @@ class Course:
         self.outside = outside
         self.linear = linear
 
-
 class Person:
     def __init__(self):
         self.requested_main_courses = []
         self.requested_alternative_courses = []
         self.requested_courses = []
         self.requested_outsides = []
-        self.finalized_schedule = ["", "", "", "", "", "", "", ""]  # New attribute
+        self.finalized_schedule = ["", "", "", "", "", "", "", ""]
 
     def add_course(self, course):
         if course.outside:
@@ -65,13 +65,6 @@ class Person:
 
     def get_course_requests(self):
         return self.requested_courses
-
-    def change_id(self, new_id):
-        self.id = new_id
-
-    def add_to_finalized_schedule(self, course):
-        self.finalized_schedule.append(course)
-
 
 def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
     schedules = []
@@ -88,8 +81,7 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
                         linear = "linear" in lines[3].lower()
                         course_to_add = Course(lines[3], lines[0], lines[11], lines[0] in outside_timetables, linear)
                         schedule.add_course(course_to_add)
-                else:
-                    schedule.change_id(lines[1])
+                
     except FileNotFoundError:
         print(f"File not found: {file_path}")
     except Exception as e:
@@ -97,8 +89,6 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
 
     return schedules
 
-
-# Gets sequencing rules from csv file
 def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
     sequences = []
     with open(file_path, mode='r', encoding='utf-8') as file:
@@ -115,179 +105,132 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
 
 def extract_sections(file_path='data/Course Information.csv'):
     sections = {}
-
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
-        
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
                 sections[line[0]] = (int)(line[14])
-
-
     return sections
 
-
 def create_timetables(schedule_requests):
-    numcurr = 1000
     for schedule in schedule_requests:
-        numcurr = numcurr + 1
-        # Get the requested main courses for this person
         main_courses = schedule.requested_main_courses
-        # Shuffle the main courses randomly
         random.shuffle(main_courses)
-
-        for course in schedule.requested_main_courses:
-            if course.course_id not in course_ids.keys() and course.course_id != '':
-                schedule.requested_main_courses.remove(course)
-
         schedule.finalized_schedule = [course.name for course in main_courses]
 
 def extract_maxEnrollment(file_path='data/Course Information.csv'):
     maxEnrollment = {}
-
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
-        
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
                 maxEnrollment[line[1]] = (int)(line[9])
-
     return maxEnrollment
 
-# Define a global variable to store visited states
-visited_states = {}
+def generate_initial_population(schedule_requests, population_size):
+    population = []
+    for _ in range(population_size):
+        create_timetables(schedule_requests)
+        master_timetable = [schedule.finalized_schedule for schedule in schedule_requests]
+        master_timetable.pop(0)
+        population.append(copy.deepcopy(master_timetable))
+    return population
 
-def generate_possible_master_timetables(master_timetable):
-    possible_master_timetables = []
-
-    for person_index, person_timetable in enumerate(master_timetable):
-        # Generate all possible swaps for this person's timetable
-        for swap_combination in combinations(range(len(person_timetable)), 2):
-            new_master_timetable = [row.copy() for row in master_timetable]
-            new_master_timetable[person_index][swap_combination[0]], new_master_timetable[person_index][swap_combination[1]] = \
-                new_master_timetable[person_index][swap_combination[1]], new_master_timetable[person_index][swap_combination[0]]
-
-            key = tuple(tuple(row) for row in new_master_timetable)
-            if key not in visited_states:
-                possible_master_timetables.append(new_master_timetable)
-
-    
-    return possible_master_timetables
-
+max_enrollments = extract_maxEnrollment()
 
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
-    master_timetable.pop(0)
-
-    # Check sequencing for each pair of courses in the master timetable
     for person_schedule in master_timetable:
-        # Extract the first 4 and last 4 courses from the person's schedule
         first_half = person_schedule[:4]
         second_half = person_schedule[4:]
-
-        # Check each sequencing rule
         for prereq, subseq in sequencing_rules:
             if prereq in course_ids.keys() and subseq in course_ids.keys():
                 if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
-                    # Reward if the prerequisite is scheduled before the subsequent course
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
-        
         for course in person_schedule:
             if "linear" in course.lower():
                 if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
                     score -= 20
                 elif course in first_half and course in second_half:
                     score += 20
-        
-
-        # Initialize an empty dictionary to store the counts
         course_counts = count_strings_in_columns(master_timetable)
-        max_enrollments = extract_maxEnrollment()
 
         for course in max_enrollments:
             if course_counts[course] > max_enrollments[course]:
                 score -= 20
             else:
                 score += 20
-    
     return score
 
 def count_strings_in_columns(array):
-    # Initialize an empty dictionary to store counts
     string_count = {}
-
-    # Determine the number of columns by finding the maximum row length
     max_cols = max(len(row) for row in array)
-
-    # Iterate through each column
     for col in range(max_cols):
         unique_strings_in_column = set()
         for row in array:
             if col < len(row):
                 unique_strings_in_column.add(row[col])
-        
-        # Update the dictionary with the unique strings in this column
         for string in unique_strings_in_column:
             if string not in string_count:
                 string_count[string] = 1
             else:
                 string_count[string] += 1
-
     return string_count
 
-def update_visited_states(master_timetable, score):
-    key = tuple(tuple(row) for row in master_timetable)
-    visited_states[key] = score
+def select_parents(population, scores, k=3):
+    selected = []
+    for _ in range(k):
+        selected.append(random.choice(population))
+    selected.sort(key=lambda x: scores[population.index(x)], reverse=True)
+    return selected[0]
 
+def crossover(parent1, parent2):
+    crossover_point = random.randint(1, len(parent1)-1)
+    child1 = parent1[:crossover_point] + parent2[crossover_point:]
+    child2 = parent2[:crossover_point] + parent1[crossover_point:]
+    return child1, child2
 
-def tabu_search(initial_solution, sequencing_rules, max_iterations, tabu_tenure):
-    current_solution = initial_solution
-    best_solution = initial_solution
-    current_score = score_master_timetable(current_solution, sequencing_rules)
-    best_score = current_score
+def mutate(timetable, mutation_rate=0.1):
+    for i in range(len(timetable)):
+        if random.random() < mutation_rate:
+            swap_idx = random.randint(0, len(timetable)-1)
+            timetable[i], timetable[swap_idx] = timetable[swap_idx], timetable[i]
+    return timetable
 
-    tabu_list = []
-    iteration = 0
-
-    while iteration < max_iterations:
-        iteration += 1
-        possible_moves = generate_possible_master_timetables(current_solution)
-        best_move = None
-        best_move_score = float('-inf')
-
-        for move in possible_moves:
-            move_score = score_master_timetable(move, sequencing_rules)
-
-            if move_score > best_move_score and move not in tabu_list:
-                best_move = move
-                best_move_score = move_score
-
-        if best_move is not None:
-            current_solution = best_move
-            current_score = best_move_score
-
-            if current_score > best_score:
-                best_solution = current_solution
-                best_score = current_score
-
-            tabu_list.append(best_move)
-            if len(tabu_list) > tabu_tenure:
-                tabu_list.pop(0)
-
-    return best_solution, best_score
-
+def genetic_algorithm(schedule_requests, sequencing_rules, population_size=100, generations=30, mutation_rate=0.5, elitism_size=5):
+    population = generate_initial_population(schedule_requests, population_size)
+    scores = [score_master_timetable(individual, sequencing_rules) for individual in population]
+    print(generations)
+    for generation in range(generations):
+        print(generation)
+        new_population = []
+        scores = [score_master_timetable(individual, sequencing_rules) for individual in population]
+        population = [x for _, x in sorted(zip(scores, population), reverse=True)]
+        for _ in range(elitism_size):
+            new_population.append(population[_])
+        while len(new_population) < population_size:
+            parent1 = select_parents(population, scores)
+            parent2 = select_parents(population, scores)
+            child1, child2 = crossover(parent1, parent2)
+            child1 = mutate(child1, mutation_rate)
+            child2 = mutate(child2, mutation_rate)
+            new_population.extend([child1, child2])
+        population = new_population
+    best_individual = max(population, key=lambda x: score_master_timetable(x, sequencing_rules))
+    best_score = score_master_timetable(best_individual, sequencing_rules)
+    return best_individual, best_score
 
 if __name__ == "__main__":
-    
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == 'Y' or line[18] == 'N':
-                course_ids[line[0]] = line[2]    
+                course_ids[line[0]] = line[2]
 
     schedule_requests = extract_schedules()
+
     sequencing = extract_sequencing()
     sections = extract_sections()
 
@@ -295,22 +238,12 @@ if __name__ == "__main__":
         while len(schedule.requested_main_courses) < 8:
             schedule.requested_main_courses.append(Course("", "", False, False, False))
 
+    initial_population_size = 100
+    generations = 30
+    mutation_rate = 0.1
+    elitism_size = 5
 
-    # Create timetables for each person
-    create_timetables(schedule_requests)
-
-    # Create master timetable
-    master_timetable = []
-
-    # Iterate over each person's schedule and append to master timetable
-    for schedule in schedule_requests:
-        master_timetable.append(schedule.finalized_schedule)
-     
-    initial_solution = master_timetable
-    max_iterations = 1000
-    tabu_tenure = 50
-
-    best_timetable, best_score = tabu_search(initial_solution, sequencing, max_iterations, tabu_tenure)
+    best_timetable, best_score = genetic_algorithm(schedule_requests, sequencing, initial_population_size, generations, mutation_rate, elitism_size)
 
     print("Best Score:", best_score)
     export_timetables_to_excel(best_timetable, 'timetables.xlsx')

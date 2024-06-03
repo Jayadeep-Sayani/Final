@@ -142,6 +142,25 @@ def create_timetables(schedule_requests):
 
         schedule.finalized_schedule = [course.name for course in main_courses]
 
+def get_timetable_from_excel(file_path):
+    try:
+        # Read the Excel file
+        df = pd.read_excel(file_path)
+
+        # Replace NaN values with empty strings
+        df = df.fillna('')
+
+        # Convert DataFrame to a 2D array
+        timetable_array = df.values.tolist()
+
+        return timetable_array
+    except FileNotFoundError:
+        print(f"File not found: {file_path}")
+        return None
+    except Exception as e:
+        print(f"Error reading {file_path}: {e}")
+        return None
+
 def extract_sections(file_path='data/Course Information.csv'):
     sections = {}
 
@@ -180,7 +199,7 @@ def generate_possible_master_timetables(master_timetable):
 
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
-    master_timetable.pop(0)
+
 
     # Check sequencing for each pair of courses in the master timetable
     for person_schedule in master_timetable:
@@ -265,16 +284,18 @@ if __name__ == "__main__":
     create_timetables(schedule_requests)
 
     # Create master timetable
+    # master_timetable = get_timetable_from_excel("timetables.xlsx")
     master_timetable = []
 
     # Iterate over each person's schedule and append to master timetable
     for schedule in schedule_requests:
         master_timetable.append(schedule.finalized_schedule)
      
+    master_timetable.pop(0)
 
     currscore = score_master_timetable(master_timetable, sequencing)
     update_visited_states(master_timetable, currscore)
-
+    export_timetables_to_excel(master_timetable, 'timetables.xlsx')
     print(currscore)
 
     newbest_score = currscore
