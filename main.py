@@ -119,86 +119,11 @@ def extract_schedules():
 
 #---------------------------------------------------------------
 
-# Creates the timetables based on requests
-def create_timetables(schedule_requests, sequencing):
-    timetables = []
-    fulfilled_requests = 0
-    all_main_courses = 0
-    
-    for schedule_request in schedule_requests:
-        fully_scheduled_count = 0
-        seven_or_eight_scheuled_count = 0        
-        courses = schedule_request.get_course_requests()
-        can_schedule = True
-        timetable = Timetable()  # Create a new timetable for each schedule request
-        
-        for out in schedule_request.outsides:
-            timetable.add_course(out, 5)
-
-        # Check if the schedule request has both a prerequisite and a subsequent
-        for seq_pair in sequencing:
-            course_id_1, course_id_2 = seq_pair
-            pair_found = False
-            prereq = None
-            subseq = None
-
-            # Finds the prereq and subseq
-            for course in courses:
-                if (course.course_id == course_id_1):
-                    prereq = course
-                if (course.course_id == course_id_2):
-                    subseq = course
-            
-            # Adds the prerequisite to semester 1 and subsequent to semester 2
-            if prereq is not None and subseq is not None and prereq not in timetable.semester_1 and subseq not in timetable.semester_2:
-                timetable.add_course(prereq, 1)
-                timetable.add_course(subseq, 2)
-                all_main_courses += 2
-
-        # Adds in the rest of the courses
-        for course in courses:
-            if course not in timetable.semester_1 and course not in timetable.semester_2:
-                all_main_courses += 1
-                if len(timetable.semester_1) < 4:
-                    timetable.add_course(course, 1)
-                elif len(timetable.semester_2) < 4:
-                    timetable.add_course(course, 2) 
-
-    total_main_courses = 0
-    for schedule_request in schedule_requests:
-        total_main_courses += len(schedule_request.get_course_requests())
-
-
-
-        if len(timetable.semester_1) == 4 and len(timetable.semester_2) == 4 and len(schedule_request.main_courses) == 8:
-            fully_scheduled_count += 1
-        
-        if (len(timetable.semester_1) + len(timetable.semester_2)) > 6 and len(schedule_request.get_course_requests()) > 6:
-            seven_or_eight_scheuled_count += 1
-    
-        
-
-        
-        
-        timetables.append(timetable)  # Add the completed timetable to the list
-
-    total_eight_main_course_requests = 0
-    total_main_requests = 0
-    total_seven_or_eight_course_requests = 0
-
-    for schedule_request in schedule_requests:
-
-
-        if len(schedule_request.get_course_requests()) > 6:
-            total_seven_or_eight_course_requests += 1
-        
-        if len(schedule_request.get_course_requests()) == 8:
-            total_eight_main_course_requests += 1
-
-    fulfilled_eight_percentage = (total_eight_main_course_requests / fully_scheduled_count) * 100
-    fulfilled_seven_or_eight_percentage = (total_seven_or_eight_course_requests / seven_or_eight_scheuled_count) * 100
-    fulfilled_main_percentage = (all_main_courses / total_main_courses) * 100
-    return timetables, fulfilled_eight_percentage, fulfilled_seven_or_eight_percentage, fulfilled_main_percentage
+def create_timetables(schedule_requests):
+    for schedule in schedule_requests:
+        main_courses = schedule.main_courses
+        random.shuffle(main_courses)
+        schedule.finalized_schedule = [course.name for course in main_courses]
 
 
 def create_real_master_timetable(timetables, max_enrolement):
@@ -206,53 +131,27 @@ def create_real_master_timetable(timetables, max_enrolement):
 
     for i in range(len(data)):
         for timetable in timetables:
-            courses = timetable.semester_1 + timetable.semester_2
-            if i < len(courses):
-                if courses[i].name in data[i]:
-                    print(courses[i].name)
-                    if data[i][courses[i].name][-1] is max_enrolement[courses[i].name]:
-                        data[i][courses[i].name].append(1)
-                    else:
-                        data[i][courses[i].name][-1] += 1
-                else:
-                    data[i][courses[i].name] = []
-                    data[i][courses[i].name].append(0)
+            courses = timetable
 
+            if i < len(courses):
+                if courses[i] in data[i] and courses[i] in max_enrolement:
+                    if data[i][courses[i]][-1] == max_enrolement[courses[i]]:
+                        data[i][courses[i]].append(1)
+                    else:
+                        data[i][courses[i]][-1] += 1
+                else:
+                    data[i][courses[i]] = []
+                    data[i][courses[i]].append(1)
     data2 = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
 
-    for key in data[0]:
-        for int in data[0][key]:
-            data2['S1A'].append(key)
+    for original, copy in zip(data, data2):
+        for key in original:
+            for int in original[key]:
+                data2[copy].append(key + ": " + str(int))
     
-    for key in data[1]:
-        for int in data[1][key]:
-            data2['S1B'].append(key)
-    
-    for key in data[2]:
-        for int in data[2][key]:
-            data2['S1C'].append(key)
-
-    for key in data[3]:
-        for int in data[3][key]:
-            data2['S1D'].append(key)
-    
-    for key in data[4]:
-        for int in data[4][key]:
-            data2['S2A'].append(key)
-    
-    for key in data[5]:
-        for int in data[5][key]:
-            data2['S2B'].append(key)
-
-    for key in data[6]:
-        for int in data[6][key]:
-            data2['S2C'].append(key)
-
-    for key in data[7]:
-        for int in data[7][key]:
-            data2['S1D'].append(key)
-    df = pd.DataFrame(data2)
-    df.to_excel('timetables.xlsx', index=False)
+    df = pd.DataFrame.from_dict(data2, orient='index')
+    df = df.transpose()
+    df.to_excel('mastertimetable.xlsx', index=False)
 
 # Exports the master timetable to an excel file
 def export_timetables_to_excel(timetables):
@@ -325,17 +224,20 @@ all_schedule_requests = extract_schedules()
 sequencing = extract_sequencing()
 blockings = extract_blockings()
 maxEnrollment = extract_maxEnrollment()
+print(maxEnrollment)
+for schedule in all_schedule_requests:
+        while len(schedule.main_courses) < 8:
+            schedule.main_courses.append(Course("", "", False, False))
 
-# Create timetables and get stats
-timetables, eight, seven_or_eight, mainper = create_timetables(all_schedule_requests, sequencing)
 
-# Print the percentage of people who got all 8 requested main courses
+create_timetables(all_schedule_requests)
+
+"""# Print the percentage of people who got all 8 requested main courses
 print(f"Percentage of people who got all 8 requested main courses: {eight:.1f}%")
 print(f"Percentage of people who got 7-8 requested main courses: {seven_or_eight:.1f}%")
 print(f"Percentage of main courses given: {mainper:.1f}%")
-
-
-
+"""
+timetables = []
+for schedule in all_schedule_requests:
+    timetables.append(schedule.finalized_schedule)
 create_real_master_timetable(timetables, maxEnrollment)
-
-
