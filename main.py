@@ -140,7 +140,7 @@ def extract_maxEnrollment(file_path='data/Course Information.csv'):
 
     return maxEnrollment
 
-def extract_blockings(file_path='data/Course Information.csv'):
+def extract_blockings(file_path='data/Course Blocking Rules.csv'):
     blockings = {}
 
     with open(file_path, mode='r', encoding='utf-8') as file:
@@ -148,15 +148,16 @@ def extract_blockings(file_path='data/Course Information.csv'):
 
         for line in csv_reader:
             column = line[2]
-            arr = column.str[9:].split(", ")
+            arr = column[9:].split(", ")
+            #print(column[9:])
             if column.startswith("Schedule"):
                 for i in range(len(arr)):
+                    list = []
                     for j in range(len(arr)):
-                        list = []
                         if i != j:
-                            list.append(arr[j].str[:10])
-                            #blockings[arr[i].str[:10]] = (arr[j].str[:10], column.split("in a ")[1])
-                    blockings[arr[i]] = list
+                            list.append(arr[j][:10])
+                    list.append(column.split("in a ")[1])
+                    blockings[arr[i][:10]] = list
 
     print(blockings)
 
@@ -296,7 +297,7 @@ if __name__ == "__main__":
     sequencing = extract_sequencing()
     sections = extract_sections()
     maxEnrollment = extract_maxEnrollment()
-    blockings = extract_blockings()
+    blockings = extract_blockings() #index of a course ID will return a list of courses in the blocking and the last index in the list will contain the type of blocking
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
