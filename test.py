@@ -4,26 +4,6 @@ import pandas as pd
 import random
 import copy
 
-def count_strings_in_columns(array):
-    # Initialize an empty dictionary to store counts
-    string_count = {}
-    
-    # Get the number of columns
-    num_columns = len(array[0])
-    
-    # Iterate through each column
-    for col_idx in range(num_columns):
-        # Use a set to store unique strings in the current column
-        unique_strings = set(row[col_idx] for row in array)
-        
-        # Update the dictionary with counts
-        for string in unique_strings:
-            if string in string_count:
-                string_count[string] += 1
-            else:
-                string_count[string] = 1
-    
-    return string_count
 
 course_ids = {}
 
@@ -144,7 +124,7 @@ def extract_maxEnrollment(file_path='data/Course Information.csv'):
         csv_reader = csv.reader(file)
         for line in csv_reader:
             if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[9])
+                maxEnrollment[line[1]] = (int)(line[14])
     return maxEnrollment
 
 def generate_initial_population(schedule_requests, population_size):
@@ -155,6 +135,27 @@ def generate_initial_population(schedule_requests, population_size):
         master_timetable.pop(0)
         population.append(copy.deepcopy(master_timetable))
     return population
+
+def extract_blockings(file_path='data/Course Blocking Rules.csv'):
+    blockings = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+
+        for line in csv_reader:
+            column = line[2]
+            arr = column[9:].split(", ")
+            #print(column[9:])
+            if column.startswith("Schedule"):
+                for i in range(len(arr)):
+                    list = []
+                    for j in range(len(arr)):
+                        if i != j:
+                            list.append(arr[j][:10])
+                    list.append(column.split("in a ")[1])
+                    blockings[arr[i][:10]] = list
+    return blockings
+
 
 max_enrollments = extract_maxEnrollment()
 
@@ -242,6 +243,35 @@ def genetic_algorithm(schedule_requests, sequencing_rules, population_size=100, 
     best_score = score_master_timetable(best_individual, sequencing_rules)
     return best_individual, best_score
 
+
+
+def create_real_master_timetable(timetables, max_enrolement):
+    data = [{}, {}, {}, {}, {}, {}, {}, {}]
+
+    for i in range(len(data)):
+        for timetable in timetables:
+            courses = timetable
+
+            if i < len(courses):
+                if courses[i] in data[i] and courses[i] in max_enrolement:
+                    if data[i][courses[i]][-1] == max_enrolement[courses[i]]:
+                        data[i][courses[i]].append(1)
+                    else:
+                        data[i][courses[i]][-1] += 1
+                else:
+                    data[i][courses[i]] = []
+                    data[i][courses[i]].append(1)
+    data2 = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
+
+    for original, copy in zip(data, data2):
+        for key in original:
+            for int in original[key]:
+                data2[copy].append(key + ": " + str(int))
+    
+    df = pd.DataFrame.from_dict(data2, orient='index')
+    df = df.transpose()
+    df.to_excel('mastertimetable.xlsx', index=False)
+
 if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
@@ -250,7 +280,7 @@ if __name__ == "__main__":
                 course_ids[line[0]] = line[2]
 
     schedule_requests = extract_schedules()
-
+    maxEnrollment = extract_maxEnrollment()
     sequencing = extract_sequencing()
     sections = extract_sections()
 
@@ -265,5 +295,10 @@ if __name__ == "__main__":
 
     best_timetable, best_score = genetic_algorithm(schedule_requests, sequencing, initial_population_size, generations, mutation_rate, elitism_size)
 
+
+
     print("Best Score:", best_score)
     export_timetables_to_excel(best_timetable, 'timetables.xlsx')
+    create_real_master_timetable(best_timetable, maxEnrollment)
+
+        
