@@ -107,7 +107,16 @@ def create_timetables(schedule_requests):
     for schedule in schedule_requests:
         main_courses = schedule.requested_main_courses
         random.shuffle(main_courses)
-        schedule.finalized_schedule = [course.name for course in main_courses]
+        for main_course in main_courses:
+            if main_course.name != '' and main_course.name not in unknown_courses and list(course_ids.keys())[list(course_ids.values()).index(main_course.name)] not in unknown_courses:
+                schedule.finalized_schedule.append(main_course.name)
+            else:
+                if len(schedule.requested_alternative_courses) >= 1:
+                    for alt_course in schedule.requested_alternative_courses:
+                        if list(course_ids.keys())[list(course_ids.values()).index(alt_course.name)] not in unknown_courses:
+                            schedule.finalized_schedule.append(alt_course.name)
+                            break
+
 
 def extract_max_sections(file_path='data/Course Information.csv'):
     maxEnrollment = {}
