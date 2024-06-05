@@ -103,22 +103,13 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
                         sequences.append((prereq, subseq))
     return sequences
 
-def extract_sections(file_path='data/Course Information.csv'):
-    sections = {}
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                sections[line[0]] = (int)(line[14])
-    return sections
-
 def create_timetables(schedule_requests):
     for schedule in schedule_requests:
         main_courses = schedule.requested_main_courses
         random.shuffle(main_courses)
         schedule.finalized_schedule = [course.name for course in main_courses]
 
-def extract_maxEnrollment(file_path='data/Course Information.csv'):
+def extract_max_sections(file_path='data/Course Information.csv'):
     maxEnrollment = {}
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
@@ -157,7 +148,7 @@ def extract_blockings(file_path='data/Course Blocking Rules.csv'):
     return blockings
 
 
-max_enrollments = extract_maxEnrollment()
+max_enrollments = extract_max_sections()
 
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
@@ -280,9 +271,9 @@ if __name__ == "__main__":
                 course_ids[line[0]] = line[2]
 
     schedule_requests = extract_schedules()
-    maxEnrollment = extract_maxEnrollment()
+    max_sections = extract_max_sections()
     sequencing = extract_sequencing()
-    sections = extract_sections()
+
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
@@ -299,6 +290,6 @@ if __name__ == "__main__":
 
     print("Best Score:", best_score)
     export_timetables_to_excel(best_timetable, 'timetables.xlsx')
-    create_real_master_timetable(best_timetable, maxEnrollment)
+    create_real_master_timetable(best_timetable, max_sections)
 
         
