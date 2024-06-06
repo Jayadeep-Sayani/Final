@@ -53,15 +53,18 @@ class Person:
         self.requested_outsides = []
         self.finalized_schedule = ["", "", "", "", "", "", "", ""]
 
-    def add_course(self, course):
+    def add_course(self, course, nonalternate_courses_requested, alternate_courses_requested):
         if course.outside:
             self.requested_outsides.append(course)
         else:
             if course.alternate == 'Y':
                 self.requested_alternative_courses.append(course)
+                nonalternate_courses_requested += 1
             else:
                 self.requested_main_courses.append(course)
+                alternate_courses_requested += 1
         self.requested_courses.append(course)
+        return nonalternate_courses_requested, alternate_courses_requested
 
     def get_course_requests(self):
         return self.requested_courses
@@ -80,14 +83,14 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
                     else:
                         linear = "linear" in lines[3].lower()
                         course_to_add = Course(lines[3], lines[0], lines[11], lines[0] in outside_timetables, linear)
-                        schedule.add_course(course_to_add)
+                        nonalternate_courses_requested, alternate_courses_requested = schedule.add_course(course_to_add, nonalternate_courses_requested, alternate_courses_requested)
                 
     except FileNotFoundError:
         print(f"File not found: {file_path}")
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
 
-    return schedules
+    return schedules, nonalternate_courses_requested, alternate_courses_requested
 
 def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
     sequences = []
@@ -289,7 +292,7 @@ if __name__ == "__main__":
             if len(line[13]) == 1:
                 course_ids[line[1]] = line[2] 
 
-    schedule_requests = extract_schedules()
+    schedule_requests, nonalternate_courses_requested, alternate_courses_requested = extract_schedules()
     max_sections = extract_max_sections()
     sequencing = extract_sequencing()
 
@@ -306,10 +309,13 @@ if __name__ == "__main__":
 
     best_timetable, best_score = genetic_algorithm(schedule_requests, sequencing, initial_population_size, generations, mutation_rate, elitism_size)
 
+    total_courses_placed = 0
 
+    for timetable in best_timetable:
+        for course in timetable:
+            total_courses_placed += 1
 
     print("Best Score:", best_score)
+    print("Number of course requests / number of courses placed: ", total_courses_placed / nonalternate_courses_requested)
     export_timetables_to_excel(best_timetable, 'timetables.xlsx')
     create_real_master_timetable(best_timetable, max_sections)
-
-        
