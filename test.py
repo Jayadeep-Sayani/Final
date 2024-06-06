@@ -175,6 +175,7 @@ max_enrollments = extract_max_sections()
 
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
+    course_counts = count_strings_in_columns(master_timetable)
     for person_schedule in master_timetable:
         first_half = person_schedule[:4]
         second_half = person_schedule[4:]
@@ -190,7 +191,6 @@ def score_master_timetable(master_timetable, sequencing_rules):
                     score -= 20
                 elif course in first_half and course in second_half:
                     score += 20
-        course_counts = count_strings_in_columns(master_timetable)
 
         for course in max_enrollments:
             if course in course_counts.keys():
