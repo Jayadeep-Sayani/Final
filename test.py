@@ -70,6 +70,8 @@ class Person:
         return self.requested_courses
 
 def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
+    nonalternate_courses_requested = 0
+    alternate_courses_requested = 0
     schedules = []
     schedule = Person()
     try:
