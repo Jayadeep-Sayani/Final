@@ -34,7 +34,7 @@ outside_timetables = [
     'MIMJB12--L', 'MWEX-2B--L', 'MMUOR12S-', ''
 ]
 
-unknown_courses = ['YESFL1AX--', 'MEFWR10---', 'XLEAD09---', 'MGE--11', 'MGE--12', 'MKOR-10---', 'MKOR-11---', 'MKOR-12---', 'MIT--12---', 'MSPLG11---', 'MJA--10---', 'MJA--11---', 'MJA--12---', 'MLTST10---', 'MLTST10--L']
+unknown_courses = ['ADST -  DRAFTING 10', 'ADST -  FOOD STUDIES 10', 'ADST - ENTREPRENEURSHIP AND MARKETING 10', 'ADST - MEDIA DESIGN 10', 'ADST -  WOODWORK 10', 'ADST -  POWER TECHNOLOGY 10']
 
 
 class Course:
@@ -108,25 +108,34 @@ def create_timetables(schedule_requests):
         main_courses = schedule.requested_main_courses
         random.shuffle(main_courses)
         for main_course in main_courses:
-            if main_course.name != '' and main_course.name not in unknown_courses and list(course_ids.keys())[list(course_ids.values()).index(main_course.name)] not in unknown_courses:
-                schedule.finalized_schedule.append(main_course.name)
-            else:
-                if len(schedule.requested_alternative_courses) >= 1:
-                    for alt_course in schedule.requested_alternative_courses:
-                        if list(course_ids.keys())[list(course_ids.values()).index(alt_course.name)] not in unknown_courses:
-                            schedule.finalized_schedule.append(alt_course.name)
-                            break
+            schedule.finalized_schedule.append(main_course.name)
+ 
+           
 
 
 def extract_max_sections(file_path='data/Course Information.csv'):
-    maxEnrollment = {}
+    sections = {}
+
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
+        
         for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[14])
-    return maxEnrollment
+            if len(line[13]) == 1:
+                sections[line[2]] = (int)(line[13])
 
+    return sections
+
+def extract_maxEnrollment(file_path='data/Course Information.csv'):
+    maxEnrollment = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+
+        for line in csv_reader:
+            if len(line[13]) == 1:
+                maxEnrollment[line[2]] = (int)(line[9])
+
+    return maxEnrollment
 def generate_initial_population(schedule_requests, population_size):
     population = []
     for _ in range(population_size):
@@ -179,10 +188,11 @@ def score_master_timetable(master_timetable, sequencing_rules):
         course_counts = count_strings_in_columns(master_timetable)
 
         for course in max_enrollments:
-            if course_counts[course] > max_enrollments[course]:
-                score -= 20
-            else:
-                score += 20
+            if course in course_counts.keys():
+                if course_counts[course] > max_enrollments[course]:
+                    score -= 20
+                else:
+                    score += 20
     return score
 
 def count_strings_in_columns(array):
@@ -276,12 +286,13 @@ if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
-            if line[18] == 'Y' or line[18] == 'N':
-                course_ids[line[0]] = line[2]
+            if len(line[13]) == 1:
+                course_ids[line[1]] = line[2] 
 
     schedule_requests = extract_schedules()
     max_sections = extract_max_sections()
     sequencing = extract_sequencing()
+
 
 
     for schedule in schedule_requests:
