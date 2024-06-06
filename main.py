@@ -120,13 +120,49 @@ def extract_sections(file_path='data/Course Information.csv'):
         csv_reader = csv.reader(file)
         
         for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                sections[line[0]] = (int)(line[14])
+            if len(line[13]) == 1:
+                sections[line[2]] = (int)(line[13])
 
     #print(sections)
 
     return sections
 
+def extract_maxEnrollment(file_path='data/Course Information.csv'):
+    maxEnrollment = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+
+        for line in csv_reader:
+            if len(line[13]) == 1:
+                maxEnrollment[line[2]] = (int)(line[9])
+
+    print(maxEnrollment)
+
+    return maxEnrollment
+
+def extract_blockings(file_path='data/Course Blocking Rules.csv'):
+    blockings = {}
+
+    with open(file_path, mode='r', encoding='utf-8') as file:
+        csv_reader = csv.reader(file)
+
+        for line in csv_reader:
+            column = line[2]
+            arr = column[9:].split(", ")
+            #print(column[9:])
+            if column.startswith("Schedule"):
+                for i in range(len(arr)):
+                    list = []
+                    for j in range(len(arr)):
+                        if i != j:
+                            list.append(arr[j][:10])
+                    list.append(column.split("in a ")[1])
+                    blockings[arr[i][:10]] = list
+
+    #print(blockings)
+
+    return blockings
 
 def create_timetables(schedule_requests):
     numcurr = 1000
@@ -161,21 +197,6 @@ def get_timetable_from_excel(file_path):
     except Exception as e:
         print(f"Error reading {file_path}: {e}")
         return None
-
-def extract_sections(file_path='data/Course Information.csv'):
-    sections = {}
-
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-        
-        for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                sections[line[1]] = (int)(line[14])
-
-    #print(sections)
-
-    return sections
-
 
 # Define a global variable to store visited states
 visited_states = {}
@@ -230,7 +251,7 @@ def score_master_timetable(master_timetable, sequencing_rules):
 
         
 
-        print(course_counts)
+        #print(course_counts)
     return score
 
 def count_strings_in_columns(array):
@@ -265,12 +286,14 @@ if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
-            if line[18] == 'Y' or line[18] == 'N':
+            if len(line[13]) == 1:
                 course_ids[line[0]] = line[2]    
 
     schedule_requests = extract_schedules()
     sequencing = extract_sequencing()
     sections = extract_sections()
+    maxEnrollment = extract_maxEnrollment()
+    blockings = extract_blockings()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
