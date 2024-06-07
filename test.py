@@ -287,6 +287,23 @@ def create_real_master_timetable(timetables, max_enrolement):
     df = df.transpose()
     df.to_excel('mastertimetable.xlsx', index=False)
 
+
+def get_timetable_by_id(id, best_timetable):
+    print(best_timetable[id - 1000])
+
+
+
+
+
+
+def get_persons_timetable(best_timetable, id):
+    for timetable in best_timetable:
+        if timetable.id == id:
+            
+
+
+
+
 if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
@@ -305,8 +322,8 @@ if __name__ == "__main__":
             schedule.requested_main_courses.append(Course("", "", False, False, False))
 
     initial_population_size = 100
-    generations = 30
-    mutation_rate = 0.1
+    generations = 10000
+    mutation_rate = 0.3
     elitism_size = 5
 
     best_timetable, best_score = genetic_algorithm(schedule_requests, sequencing, initial_population_size, generations, mutation_rate, elitism_size)
