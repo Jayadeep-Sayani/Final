@@ -291,19 +291,10 @@ def create_real_master_timetable(timetables, max_enrolement):
 def get_timetable_by_id(id, best_timetable):
     print(best_timetable[id - 1000])
 
-
-
-
-
-
 def get_persons_timetable(best_timetable, id):
     for timetable in best_timetable:
         if timetable.id == id:
             
-
-
-
-
 if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
