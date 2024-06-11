@@ -1,4 +1,5 @@
 import csv
+from joblib import Parallel, delayed
 import numpy as np
 import pandas as pd
 import random
@@ -11,14 +12,14 @@ def export_timetables_to_excel(timetables, file_path):
     data = {'S1A': [], 'S1B': [], 'S1C': [], 'S1D': [], 'S2A': [], 'S2B': [], 'S2C': [], 'S2D': []}
 
     for timetable in timetables:
-        data['S1A'].append(timetable[0] if len(timetable) > 0 else '')
-        data['S1B'].append(timetable[1] if len(timetable) > 1 else '')
-        data['S1C'].append(timetable[2] if len(timetable) > 2 else '')
-        data['S1D'].append(timetable[3] if len(timetable) > 3 else '')
-        data['S2A'].append(timetable[4] if len(timetable) > 4 else '')
-        data['S2B'].append(timetable[5] if len(timetable) > 5 else '')
-        data['S2C'].append(timetable[6] if len(timetable) > 6 else '')
-        data['S2D'].append(timetable[7] if len(timetable) > 7 else '')
+        data['S1A'].append(timetable.finalized_schedule[0] if len(timetable.finalized_schedule) > 0 else '')
+        data['S1B'].append(timetable.finalized_schedule[1] if len(timetable.finalized_schedule) > 1 else '')
+        data['S1C'].append(timetable.finalized_schedule[2] if len(timetable.finalized_schedule) > 2 else '')
+        data['S1D'].append(timetable.finalized_schedule[3] if len(timetable.finalized_schedule) > 3 else '')
+        data['S2A'].append(timetable.finalized_schedule[4] if len(timetable.finalized_schedule) > 4 else '')
+        data['S2B'].append(timetable.finalized_schedule[5] if len(timetable.finalized_schedule) > 5 else '')
+        data['S2C'].append(timetable.finalized_schedule[6] if len(timetable.finalized_schedule) > 6 else '')
+        data['S2D'].append(timetable.finalized_schedule[7] if len(timetable.finalized_schedule) > 7 else '')
 
     df = pd.DataFrame(data)
     df.to_excel(file_path, index=False)
@@ -33,8 +34,6 @@ outside_timetables = [
     'MGRPR12--L', 'MGMT-12L--', 'YED--2DX-L', 'YED--2FX-L', 'MCMCC12--L', 'MWEX-2A--L',
     'MIMJB12--L', 'MWEX-2B--L', 'MMUOR12S-', ''
 ]
-
-unknown_courses = ['YESFL1AX--', 'MEFWR10---', 'XLEAD09---', 'MGE--11', 'MGE--12', 'MKOR-10---', 'MKOR-11---', 'MKOR-12---', 'MIT--12---', 'MSPLG11---', 'MJA--10---', 'MJA--11---', 'MJA--12---', 'MLTST10---', 'MLTST10--L']
 
 
 class Course:
@@ -59,7 +58,7 @@ class Person:
         else:
             if course.alternate == 'Y':
                 self.requested_alternative_courses.append(course)
-            else:
+            elif course.alternate == 'N':
                 self.requested_main_courses.append(course)
         self.requested_courses.append(course)
 
@@ -108,8 +107,8 @@ def extract_sections(file_path='data/Course Information.csv'):
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                sections[line[0]] = (int)(line[14])
+            if len(line[13]) == 1:
+                sections[line[2]] = (int)(line[13])
     return sections
 
 def create_timetables(schedule_requests):
@@ -123,66 +122,62 @@ def extract_maxEnrollment(file_path='data/Course Information.csv'):
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
-            if line[18] == "Y" or line[18] == "N":
-                maxEnrollment[line[1]] = (int)(line[14])
+            if len(line[13]) == 1:
+                if int(line[13]) != 0:
+                    maxEnrollment[line[2]] = int(line[9]) / int(line[13])
+                                                              
     return maxEnrollment
-
-def generate_initial_population(schedule_requests, population_size):
-    population = []
-    for _ in range(population_size):
-        create_timetables(schedule_requests)
-        master_timetable = [schedule.finalized_schedule for schedule in schedule_requests]
-        master_timetable.pop(0)
-        population.append(copy.deepcopy(master_timetable))
-    return population
-
-def extract_blockings(file_path='data/Course Blocking Rules.csv'):
-    blockings = {}
-
-    with open(file_path, mode='r', encoding='utf-8') as file:
-        csv_reader = csv.reader(file)
-
-        for line in csv_reader:
-            column = line[2]
-            arr = column[9:].split(", ")
-            #print(column[9:])
-            if column.startswith("Schedule"):
-                for i in range(len(arr)):
-                    list = []
-                    for j in range(len(arr)):
-                        if i != j:
-                            list.append(arr[j][:10])
-                    list.append(column.split("in a ")[1])
-                    blockings[arr[i][:10]] = list
-    return blockings
-
 
 max_enrollments = extract_maxEnrollment()
 
+
 def score_master_timetable(master_timetable, sequencing_rules):
     score = 0
+    
+    # Define time blocks
+    time_blocks = ['S1A', 'S1B', 'S1C', 'S1D', 'S2A', 'S2B', 'S2C', 'S2D']
+    
+    # Initialize a dictionary to count enrollments in each time block
+    timeblock_enrollment = {block: {} for block in time_blocks}
+
+
     for person_schedule in master_timetable:
         first_half = person_schedule[:4]
         second_half = person_schedule[4:]
+        
+        # Check sequencing rules
         for prereq, subseq in sequencing_rules:
             if prereq in course_ids.keys() and subseq in course_ids.keys():
                 if course_ids[prereq] in first_half and course_ids[subseq] in second_half:
                     score += 10
                 elif course_ids[prereq] in second_half and course_ids[subseq] in first_half:
                     score -= 10
+        
+        # Check linear courses
         for course in person_schedule:
             if "linear" in course.lower():
                 if (course in first_half and course not in second_half) or (course in second_half and course not in first_half):
                     score -= 20
                 elif course in first_half and course in second_half:
                     score += 20
-        course_counts = count_strings_in_columns(master_timetable)
-
-        for course in max_enrollments:
-            if course_counts[course] > max_enrollments[course]:
-                score -= 20
-            else:
-                score += 20
+        
+        # Count enrollments in each time block
+        for i, course in enumerate(person_schedule):
+            if i < len(time_blocks):  # Ensure index does not exceed the length of time_blocks
+                if course:
+                    block = time_blocks[i]
+                    if course not in timeblock_enrollment[block]:
+                        timeblock_enrollment[block][course] = 0
+                    timeblock_enrollment[block][course] += 1
+        
+    
+    # Penalize schedules where time block enrollments do not meet the 50% threshold
+    for block, courses in timeblock_enrollment.items():
+        for course, count in courses.items():
+            if course in max_enrollments:
+                if count < 0.5 * max_enrollments[course] or count > max_enrollments[course]:
+                    score -= 100
+    
     return score
 
 def count_strings_in_columns(array):
@@ -213,24 +208,41 @@ def crossover(parent1, parent2):
     child2 = parent2[:crossover_point] + parent1[crossover_point:]
     return child1, child2
 
-def mutate(timetable, mutation_rate=0.1):
-    for i in range(len(timetable)):
-        if random.random() < mutation_rate:
-            swap_idx = random.randint(0, len(timetable)-1)
-            timetable[i], timetable[swap_idx] = timetable[swap_idx], timetable[i]
-    return timetable
+def mutate(schedule_requests, mutation_rate=0.1):
+    for person in schedule_requests:
+        # Perform mutation on main courses
+        for i in range(len(person.finalized_schedule)):
+            if random.random() < mutation_rate:
+                if random.random() < 0.5:
+                    swap_idx = random.randint(0, len(person.finalized_schedule)-1)
+                    person.finalized_schedule[i], person.finalized_schedule[swap_idx] = person.finalized_schedule[swap_idx], person.finalized_schedule[i]
+                else:
+                    if len(person.requested_alternative_courses) > 0:
+                        alt_swap_idx = random.randint(0, len(person.requested_alternative_courses)-1)
+                        person.finalized_schedule[i], person.requested_alternative_courses[alt_swap_idx].name = person.requested_alternative_courses[alt_swap_idx].name, person.finalized_schedule[i]
+                    else:
+                        swap_idx = random.randint(0, len(person.finalized_schedule)-1)
+                        person.finalized_schedule[i], person.finalized_schedule[swap_idx] = person.finalized_schedule[swap_idx], person.finalized_schedule[i]
+    return schedule_requests
 
-def genetic_algorithm(schedule_requests, sequencing_rules, population_size=100, generations=30, mutation_rate=0.5, elitism_size=5):
+
+def genetic_algorithm(schedule_requests, sequencing_rules, population_size=120, generations=20, mutation_rate=0.3, elitism_size=5):
     population = generate_initial_population(schedule_requests, population_size)
-    scores = [score_master_timetable(individual, sequencing_rules) for individual in population]
-    print(generations)
+    best_score = float('-inf')
+    best_individual = None
+
     for generation in range(generations):
-        print(generation)
-        new_population = []
-        scores = [score_master_timetable(individual, sequencing_rules) for individual in population]
-        population = [x for _, x in sorted(zip(scores, population), reverse=True)]
-        for _ in range(elitism_size):
-            new_population.append(population[_])
+        print(f"Generation {generation}")
+        scores = Parallel(n_jobs=-1)(delayed(score_master_timetable)([person.finalized_schedule for person in individual], sequencing_rules) for individual in population)
+        best_generation_score = max(scores)
+        best_generation_individual = population[scores.index(best_generation_score)]
+
+        if best_generation_score > best_score:
+            best_score = best_generation_score
+            best_individual = best_generation_individual
+
+        new_population = [best_generation_individual]
+
         while len(new_population) < population_size:
             parent1 = select_parents(population, scores)
             parent2 = select_parents(population, scores)
@@ -238,19 +250,27 @@ def genetic_algorithm(schedule_requests, sequencing_rules, population_size=100, 
             child1 = mutate(child1, mutation_rate)
             child2 = mutate(child2, mutation_rate)
             new_population.extend([child1, child2])
-        population = new_population
-    best_individual = max(population, key=lambda x: score_master_timetable(x, sequencing_rules))
-    best_score = score_master_timetable(best_individual, sequencing_rules)
+
+        population = new_population[:population_size]
+    print(best_individual)
     return best_individual, best_score
 
 
+
+def generate_initial_population(schedule_requests, population_size):
+    population = []
+    for _ in range(population_size):
+        schedule_copy = copy.deepcopy(schedule_requests)
+        create_timetables(schedule_copy)
+        population.append(schedule_copy)
+    return population
 
 def create_real_master_timetable(timetables, max_enrolement):
     data = [{}, {}, {}, {}, {}, {}, {}, {}]
 
     for i in range(len(data)):
         for timetable in timetables:
-            courses = timetable
+            courses = timetable.finalized_schedule
 
             if i < len(courses):
                 if courses[i] in data[i] and courses[i] in max_enrolement:
@@ -266,39 +286,90 @@ def create_real_master_timetable(timetables, max_enrolement):
     for original, copy in zip(data, data2):
         for key in original:
             for int in original[key]:
-                data2[copy].append(key + ": " + str(int))
+                if key != '':
+                    data2[copy].append(key + ": " + str(int))
+                else:
+                    data2[copy].append(key)
     
     df = pd.DataFrame.from_dict(data2, orient='index')
     df = df.transpose()
     df.to_excel('mastertimetable.xlsx', index=False)
 
+
+def get_timetable_by_id(id, best_timetable):
+    print(best_timetable[id - 1000])
+
+
 if __name__ == "__main__":
     with open("data/Course Information.csv", mode='r') as file:
         csv_reader = csv.reader(file)
         for line in csv_reader:
-            if line[18] == 'Y' or line[18] == 'N':
+            if len(line[13]) == 1:
                 course_ids[line[0]] = line[2]
 
     schedule_requests = extract_schedules()
-    maxEnrollment = extract_maxEnrollment()
+
     sequencing = extract_sequencing()
     sections = extract_sections()
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
-            schedule.requested_main_courses.append(Course("", "", False, False, False))
+            schedule.requested_main_courses.append(Course("", "", 'N', False, False))
 
-    initial_population_size = 100
-    generations = 30
-    mutation_rate = 0.1
+    initial_population_size = 200
+    generations = 70
+    mutation_rate = 0.5
     elitism_size = 5
 
     best_timetable, best_score = genetic_algorithm(schedule_requests, sequencing, initial_population_size, generations, mutation_rate, elitism_size)
+        
+    total_main_requests = 0
+    total_main_fulfill = 0
 
+    total_eight_mains_people = 0
+    total_eight_main_schedules = 0
+    total_seven_eight_main_schedules = 0
+    total_eight_main_or_alt_schedules = 0
 
+    for schedule in best_timetable:
+        for course in schedule.requested_main_courses:
+            if course.name != '':
+                total_main_requests += 1
+
+        for course in schedule.finalized_schedule:
+            if course in [course.name for course in schedule.requested_main_courses]:
+                total_main_fulfill += 1
+
+    for schedule in best_timetable:
+        if len(schedule.requested_main_courses) == 8:
+            total_eight_mains_people += 1
+
+            requested_course_names = [course.name for course in schedule.requested_main_courses]
+            print(requested_course_names)
+            fulfilled_courses = sum(1 for course in schedule.finalized_schedule if course in requested_course_names)
+
+            if fulfilled_courses == 8:
+                total_eight_main_schedules += 1
+            if 7 <= fulfilled_courses <= 8:
+                total_seven_eight_main_schedules += 1
+
+            # Check for main or alternate courses fulfillment
+            requested_main_or_alt_names = requested_course_names + [course.name for course in schedule.requested_alternative_courses]
+            print(requested_main_or_alt_names)
+            fulfilled_main_or_alt_courses = sum(1 for course in schedule.finalized_schedule if course in requested_main_or_alt_names)
+
+            if fulfilled_main_or_alt_courses == 8:
+                total_eight_main_or_alt_schedules += 1
 
     print("Best Score:", best_score)
-    export_timetables_to_excel(best_timetable, 'timetables.xlsx')
-    create_real_master_timetable(best_timetable, maxEnrollment)
+    print("Total Main Requests Placed: ", total_main_fulfill * 100 / total_main_requests)
+    print("Total 8/8 Main Requests Placed: ", total_eight_main_schedules * 100 / total_eight_mains_people)
+    print("Total 7-8/8 Main Requests Placed: ", total_seven_eight_main_schedules * 100 / total_eight_mains_people)
+    print("Total 8/8 Main or Alternate Requests Placed: ", total_eight_main_or_alt_schedules * 100 / total_eight_mains_people)
 
-        
+
+    export_timetables_to_excel(best_timetable, 'timetables.xlsx')
+    create_real_master_timetable(best_timetable, max_enrollments)
+
+
+    get_timetable_by_id(1000, best_timetable)
