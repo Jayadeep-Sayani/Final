@@ -173,12 +173,16 @@ def extract_blockings(file_path='data/Course Blocking Rules.csv'):
 
 max_enrollments = extract_max_sections()
 
-def is_valid_timetable(schedule, sequencing_rules, max_enrollments, blockings):
-    for i in range(schedule):
-        if schedule[i].size > max_enrollments[i]:
-            return False
+sequencing_rules = extract_sequencing()
 
-        
+
+def is_valid_timetable(schedule, sequencing_rules, max_enrollments, blockings):
+    for student in schedule:
+        for course in student:
+            for rule in sequencing_rules:
+                if sequencing 
+
+for 
 
 
 
