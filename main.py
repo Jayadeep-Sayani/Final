@@ -84,6 +84,9 @@ class Student:
     
     def get_main_courses(self):
         return self.main_courses
+    
+    def get_alternate_courses(self):
+        return self.alternate_courses
 
 
 
@@ -228,7 +231,10 @@ def create_timetables():
         
 
     create_master_table(best_ttble)
-    print("Percent of all requested courses placed: ", f"{requested_course_metrics() * 100:.2f}", "%")
+    print("Percent of all requested courses placed: ", f"{requested_course_metrics():.2f}", "%")
+    print("Percent of students with 8/8 requested courses: ", f"{eight_out_of_eight_requested_metrics():.2f}", "%")
+    print("Percent of students with 8/8 requested or alternate courses: ", f"{eight_out_of_eight_requested_or_alternate_metrics():.2f}", "%")
+
 
 
 def create_master_table(ttble):
@@ -248,7 +254,45 @@ def requested_course_metrics():
                         totalPlacedReqCourses += 1
                         break
 
-        return totalPlacedReqCourses / totalReqCourses
+        return 100 * totalPlacedReqCourses / totalReqCourses
+
+def eight_out_of_eight_requested_metrics():
+    numStudents = 0
+    numEightOutOfEight = 0
+    
+    for student in people:
+        if len(student.get_main_courses()) > 7:
+            numStudents += 1
+            placedCourses = 0
+            for course in student.get_main_courses():
+                for placed_course in student.get_timetable().get_all_course_sections():
+                    if course.course_id == placed_course.get_course().course_id:
+                        placedCourses += 1
+                        break
+            if placedCourses > 7:
+                numEightOutOfEight += 1
+    
+    return 100 * numEightOutOfEight / numStudents
+
+
+def eight_out_of_eight_requested_or_alternate_metrics():
+    numStudents = 0
+    numEightOutOfEight = 0
+    
+    for student in people:
+        if len(student.get_main_courses() + student.get_alternate_courses()) > 7:
+            numStudents += 1
+            placedCourses = 0
+            for course in student.get_main_courses() + student.get_alternate_courses():
+                for placed_course in student.get_timetable().get_all_course_sections():
+                    if course.course_id == placed_course.get_course().course_id:
+                        placedCourses += 1
+                        break
+            if placedCourses > 7:
+                numEightOutOfEight += 1
+    
+    return 100 * numEightOutOfEight / numStudents
+
 
 
 if __name__ == '__main__':
