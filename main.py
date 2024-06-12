@@ -312,6 +312,8 @@ if __name__ == "__main__":
 
     sequencing = extract_sequencing()
     sections = extract_sections()
+    maxEnrollment = extract_maxEnrollment()
+    blockings = extract_blockings() #index of a course ID will return a list of courses in the blocking and the last index in the list will contain the type of blocking
 
     for schedule in schedule_requests:
         while len(schedule.requested_main_courses) < 8:
