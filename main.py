@@ -1,6 +1,7 @@
 import copy
 import csv
 import random
+import openpyxl
 
 courses = []
 people = []
@@ -84,7 +85,6 @@ class Student:
     
     def get_main_courses(self):
         return self.main_courses
-
 
 
 class Timetable:
@@ -207,7 +207,7 @@ def create_timetables():
     high_score = requested_course_metrics()
     cur_score = 0
 
-    for i in range(100):
+    for i in range(10):
         print(i)
 
         for course in courses:
@@ -229,10 +229,39 @@ def create_timetables():
 
     create_master_table(best_ttble)
     print("Percent of all requested courses placed: ", f"{requested_course_metrics() * 100:.2f}", "%")
+    print("Percent of people with 8/8 requested courses ", f"{requested_course_metrics_eight() * 100:.2f}", "%")
+    print("Percent of people with 7-8/8 requested courses ", f"{requested_course_metrics_seven_eight() * 100:.2f}", "%")
+    print("Percent of people with 8/8 requested or alternate courses ", f"{eight_req_or_alt() * 100:.2f}", "%")
 
+def create_master_table(timetable):
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Master Timetable"
 
-def create_master_table(ttble):
-    print(ttble.get_all_course_sections())
+    # Add headers
+    ws.cell(row=1, column=1).value = "S1A"
+    ws.cell(row=1, column=2).value = "S1B"
+    ws.cell(row=1, column=3).value = "S1C"
+    ws.cell(row=1, column=4).value = "S1D"
+    ws.cell(row=1, column=5).value = "S2A"
+    ws.cell(row=1, column=6).value = "S2B"
+    ws.cell(row=1, column=7).value = "S2C"
+    ws.cell(row=1, column=8).value = "S2D"
+
+    # Populate data
+    row = 2
+    for slot in range(8):
+        for course_section in timetable.get_schedule(slot):
+            course = course_section.get_course()
+            course_id = course.course_id
+            students_enrolled = len(course_section.get_students())
+            ws.cell(row=row, column=slot+1).value = f"{course_id} ({students_enrolled})"
+            row += 1
+        row = 2
+
+    # Save the workbook
+    wb.save("Master_Timetable.xlsx")
+
 
 
 def requested_course_metrics():
@@ -249,6 +278,59 @@ def requested_course_metrics():
                         break
 
         return totalPlacedReqCourses / totalReqCourses
+
+def requested_course_metrics_eight():
+    num_students_with_all_requested_courses = 0
+
+    for student in people:
+        if len(student.get_main_courses()) == 8:  # Check if the student requested 8 main courses
+            num_requested_courses_in_timetable = 0
+            for req_course in student.get_main_courses():
+                for act_course in student.get_timetable().get_all_course_sections():
+                    if req_course.course_id == act_course.get_course().course_id:
+                        num_requested_courses_in_timetable += 1
+                        break
+            if num_requested_courses_in_timetable == 8:  # Check if all 8 requested courses are in the timetable
+                num_students_with_all_requested_courses += 1
+
+    return num_students_with_all_requested_courses / len(people)
+
+def requested_course_metrics_seven_eight():
+    num_students_with_all_requested_courses = 0
+
+    for student in people:
+        if len(student.get_main_courses()) >= 7:  
+            num_requested_courses_in_timetable = 0
+            for req_course in student.get_main_courses():
+                for act_course in student.get_timetable().get_all_course_sections():
+                    if req_course.course_id == act_course.get_course().course_id:
+                        num_requested_courses_in_timetable += 1
+                        break
+            if num_requested_courses_in_timetable >= 7:  # Check if all 8 requested courses are in the timetable
+                num_students_with_all_requested_courses += 1
+
+    return num_students_with_all_requested_courses / len(people)
+
+def eight_req_or_alt():
+    num_students_with_all_requested_courses = 0
+
+    for student in people:
+        if len(student.get_main_courses()) == 8:  # Check if the student requested 8 courses in total
+            num_requested_courses_in_timetable = 0
+            for req_course in student.get_main_courses():
+                for act_course in student.get_timetable().get_all_course_sections():
+                    if req_course.course_id == act_course.get_course().course_id:
+                        num_requested_courses_in_timetable += 1
+                        break
+            for alt_course in student.alternate_courses:
+                for act_course in student.get_timetable().get_all_course_sections():
+                    if alt_course.course_id == act_course.get_course().course_id:
+                        num_requested_courses_in_timetable += 1
+                        break
+            if num_requested_courses_in_timetable == 8:  # Check if all 8 requested or alternate courses are in the timetable
+                num_students_with_all_requested_courses += 1
+
+    return num_students_with_all_requested_courses / len(people)
 
 
 if __name__ == '__main__':
