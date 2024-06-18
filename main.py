@@ -113,7 +113,7 @@ class Timetable:
                 self.semester_2.append(course)
 
 # Extract schedules from csv file
-def extract_schedules(file_path='Cleaned Student Requests.csv'):
+def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
     schedules = []
     schedule = CoursesRequest()
     with open(file_path, mode='r') as file:
