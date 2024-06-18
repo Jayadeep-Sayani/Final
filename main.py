@@ -1,9 +1,8 @@
 import csv
 import pandas as pd
 
-
 def extract_max_enrollment():
-    
+
     # Initialize an empty list to store the course ID and max enrollment pairs
     course_enrollment = []
 
@@ -16,7 +15,6 @@ def extract_max_enrollment():
                 max_enrollment = row[9]
                 course_enrollment.append((course_id, max_enrollment))
     return course_enrollment
-
 
 max_enrollments = []
 
@@ -132,52 +130,65 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
 
     return schedules
 
-# Creates the timetables based on requests
-def create_timetables(schedule_requests, sequencing):
-    timetables = []
-    fulfilled_requests = 0
+def create_timetables_recursive(schedule_requests, sequencing, index=0, timetables=None):
+    if timetables is None:
+        timetables = []
     
-    for schedule_request in schedule_requests:
-        courses = schedule_request.get_course_requests()
-        timetable = Timetable()  # Create a new timetable for each schedule request
-        
-        for out in schedule_request.outsides:
-            timetable.add_course(out, 5)
+    # Base case: If all schedule requests are processed
+    if index >= len(schedule_requests):
+        return timetables
 
-        # Check if the schedule request has both a prerequisite and a subsequent
+    schedule_request = schedule_requests[index]
+    courses = schedule_request.get_course_requests()
+    timetable = Timetable()  # Create a new timetable for each schedule request
+    
+    for out in schedule_request.outsides:
+        timetable.add_course(out, 5)
+    
+    def add_course_to_timetable(course, semester):
+        if course not in timetable.semester_1 and course not in timetable.semester_2:
+            timetable.add_course(course, semester)
+
+    # Recursive case: Process each course in the schedule request
+    def process_courses(courses, sequencing):
+        if not courses:
+            return
+        course = courses[0]
+        remaining_courses = courses[1:]
+        
         for seq_pair in sequencing:
             course_id_1, course_id_2 = seq_pair
             prereq = None
             subseq = None
 
             # Finds the prereq and subseq
-            for course in courses:
-                if course.course_id == course_id_1:
-                    prereq = course
-                if course.course_id == course_id_2:
-                    subseq = course
+            for c in courses:
+                if c.course_id == course_id_1:
+                    prereq = c
+                if c.course_id == course_id_2:
+                    subseq = c
             
             # Adds the prerequisite to semester 1 and subsequent to semester 2
             if prereq is not None and subseq is not None and prereq not in timetable.semester_1 and subseq not in timetable.semester_2:
                 timetable.add_course(prereq, 1)
                 timetable.add_course(subseq, 2)
 
-        for course in courses:
-            if course.linear and course not in timetable.semester_1 and course not in timetable.semester_2 and len(timetable.semester_1) < 4 and len(timetable.semester_2) < 4:
-                timetable.add_course(course, 1)
-                timetable.add_course(course, 2)
+        if course.linear and course not in timetable.semester_1 and course not in timetable.semester_2 and len(timetable.semester_1) < 4 and len(timetable.semester_2) < 4:
+            timetable.add_course(course, 1)
+            timetable.add_course(course, 2)
+        else:
+            if course not in timetable.semester_1 and len(timetable.semester_1) < 4:
+                add_course_to_timetable(course, 1)
+            elif course not in timetable.semester_2 and len(timetable.semester_2) < 4:
+                add_course_to_timetable(course, 2)
 
-        # Adds in the rest of the courses
-        for course in courses:
-            if course not in timetable.semester_1 and course not in timetable.semester_2:
-                if len(timetable.semester_1) < 4:
-                    timetable.add_course(course, 1)
-                elif len(timetable.semester_2) < 4:
-                    timetable.add_course(course, 2)
+        process_courses(remaining_courses, sequencing)
+    
+    process_courses(courses, sequencing)
+    timetables.append(timetable)
 
-        timetables.append(timetable)  # Add the completed timetable to the list
+    return create_timetables_recursive(schedule_requests, sequencing, index + 1, timetables)
 
-    return timetables, fulfilled_requests
 
 # Exports the master timetable to an excel file
 def export_timetables_to_excel(timetables):
@@ -200,22 +211,23 @@ def export_timetables_to_excel(timetables):
     df.to_excel('timetables.xlsx', index=False)
 
 # Gets sequencing rules from csv file
-def extract_sequencing(file_path='Course Sequencing Rules.csv'):
+def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
     sequences = []
     with open(file_path, mode='r', encoding='utf-8') as file:
         csv_reader = csv.reader(file_path)
         for line in csv_reader:
-            if line[2].startswith("Sequence"):
-                parts = line[2].split(" before ")
-                parts[0] = parts[0].split(" ")[1]
-                for part in parts:
-                    prereq = parts[0]
-                    for subseq in parts[1].split(", "):
-                        sequences.append((prereq, subseq))
+            if len(line) >= 3:
+                if line[2].startswith("Sequence"):
+                    parts = line[2].split(" before ")
+                    parts[0] = parts[0].split(" ")[1]
+                    for part in parts:
+                        prereq = parts[0]
+                        for subseq in parts[1].split(", "):
+                            sequences.append((prereq, subseq))       
     return sequences
 
 
-def extract_blockings(file_path='Course Blocking Rules.csv'):
+def extract_blockings(file_path='data/Course Blocking Rules.csv'):
     with open(file_path, mode='r', encoding='utf-8'):
         simulataneous_blocking = []
         nonsimulataneous_blocking = []
@@ -236,7 +248,7 @@ sequencing = extract_sequencing()
 simulataneous_blockings, nonsimulataneous_blocking, term_blocking = extract_blockings()
 
 # Create timetables and get stats
-timetables, fulfilled_requests = create_timetables(all_schedule_requests, sequencing)
+timetables = create_timetables_recursive(all_schedule_requests, sequencing)
 
 export_timetables_to_excel(timetables)
 
