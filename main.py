@@ -189,6 +189,18 @@ def create_timetables_recursive(schedule_requests, sequencing, index=0, timetabl
 
     return create_timetables_recursive(schedule_requests, sequencing, index + 1, timetables)
 
+def num_fulfilled_requests(all_schedule_requests, timetable):
+    num_fulfilled = 0
+    print(len(all_schedule_requests) * 8)
+    for i in range(len(all_schedule_requests)):
+        for course in all_schedule_requests[i].main_courses:
+            if course in timetable[i].semester_1 or timetable[i].semester_2:
+                num_fulfilled += 1
+            else:
+                print (i + " not given " + course)
+
+    return num_fulfilled
+
 
 # Exports the master timetable to an excel file
 def export_timetables_to_excel(timetables):
@@ -228,12 +240,12 @@ def extract_sequencing(file_path='data/Course Sequencing Rules.csv'):
 
 
 def extract_blockings(file_path='data/Course Blocking Rules.csv'):
-    with open(file_path, mode='r', encoding='utf-8'):
+    with open(file_path, mode='r', encoding='utf-8') as file:
         simulataneous_blocking = []
         nonsimulataneous_blocking = []
         term_blocking = [] 
 
-        csv_reader = csv.reader(file_path)
+        csv_reader = csv.reader(file)
         for line in csv_reader:
             print(line)
 
@@ -249,6 +261,7 @@ simulataneous_blockings, nonsimulataneous_blocking, term_blocking = extract_bloc
 
 # Create timetables and get stats
 timetables = create_timetables_recursive(all_schedule_requests, sequencing)
+fulfilled_requests = num_fulfilled_requests(all_schedule_requests, timetables)
 
 export_timetables_to_excel(timetables)
 
