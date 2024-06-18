@@ -46,7 +46,7 @@ class CourseSection:
         self.section_num = num
         self.students = []
     
-    def add_student(self, new_student):
+    def add_student(self, new_student, type):
         if len(self.students) < self.course.enrollment_max:
             if len(new_student.t.schedule[self.block]) > 0:
                 return
@@ -76,9 +76,13 @@ class Student:
     def give_courses(self):
         for i in range(len(self.main_courses)):
             if self.main_courses[i] is not None:
-                self.main_courses[i].add_student(self)
+                if len(self.main_courses[i].prereqs) > 0:
+                    for prereq in self.main_courses[i].prereqs:
+                        if prereq in self.main_courses:
+                            prereq.add_student(self, 1)
+                    self.main_courses[i].add_student(self, 3)
         for i in range(min(len(self.main_courses) - len(self.t.get_all_course_sections()), len(self.alternate_courses))):
-            self.alternate_courses[i].add_student(self)
+            self.alternate_courses[i].add_student(self, 3)
     
     def get_timetable(self):
         return self.t
@@ -211,7 +215,7 @@ def create_timetables():
     high_score = requested_course_metrics()
     cur_score = 0
 
-    for i in range(10):
+    for i in range(30):
         print(i)
 
         for course in courses:
@@ -281,7 +285,7 @@ def requested_course_metrics():
                         totalPlacedReqCourses += 1
                         break
 
-        return 100 * totalPlacedReqCourses / totalReqCourses
+        return totalPlacedReqCourses / totalReqCourses
 
 def requested_course_metrics_eight():
     num_students_with_all_requested_courses = 0
