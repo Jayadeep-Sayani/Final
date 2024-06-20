@@ -1,7 +1,7 @@
-
-
 import csv
 import pandas as pd
+import pyomo.environ as pyo
+from pyomo.opt import SolverFactory
 
 def extract_max_enrollment():
 
@@ -133,9 +133,49 @@ def extract_schedules(file_path='data/Cleaned Student Requests.csv'):
     return schedules
 
 def create_timetables_mixed(schedule_requests, sequencing, index=0, timetables=None):
+    model = pyo.ConcreteModel()
     
+    # Sets
+    model.C = pyo.Set(initialize=range(len(schedule_requests)))  # Set of students
+    model.S = pyo.Set(initialize=[1, 2])  # Set of semesters
+    model.K = pyo.Set(initialize=range(4))  # Set of course slots per semester
 
+    # Parameters
+    model.requests = pyo.Param(model.C, initialize={i: len(req.main_courses) for i, req in enumerate(schedule_requests)}, within=pyo.NonNegativeIntegers)
+    
+    # Variables
+    model.x = pyo.Var(model.C, model.S, model.K, domain=pyo.Binary)  # Binary variables to decide if a course is in a particular slot
+    
+    # Constraints
+    def request_satisfaction_rule(model, c):
+        return sum(model.x[c, s, k] for s in model.S for k in model.K) <= model.requests[c]
+    model.request_satisfaction = pyo.Constraint(model.C, rule=request_satisfaction_rule)
 
+    def unique_slot_rule(model, c, s, k):
+        return sum(model.x[c, s, k] for s in model.S for k in model.K) <= 1
+    model.unique_slot = pyo.Constraint(model.C, model.S, model.K, rule=unique_slot_rule)
+
+    # Objective
+    def objective_rule(model):
+        return sum(model.x[c, s, k] for c in model.C for s in model.S for k in model.K)
+    model.objective = pyo.Objective(rule=objective_rule, sense=pyo.maximize)
+
+    # Solve
+    solver = pyo.SolverFactory('glpk')
+    results = solver.solve(model, tee=True)
+
+    # Extract timetables
+    if timetables is None:
+        timetables = [Timetable() for _ in schedule_requests]
+    
+    for c in model.C:
+        for s in model.S:
+            for k in model.K:
+                if pyo.value(model.x[c, s, k]) > 0.5:
+                    course = schedule_requests[c].main_courses[k]
+                    timetables[c].add_course(course, s)
+    
+    return timetables
 
 def num_fulfilled_requests(all_schedule_requests, timetable):
     num_fulfilled = 0
@@ -224,7 +264,7 @@ sequencing = extract_sequencing()
 simulataneous_blockings, nonsimulataneous_blocking, term_blocking = extract_blockings()
 
 # Create timetables and get stats
-timetables = create_timetables_recursive(all_schedule_requests, sequencing)
+timetables = create_timetables_mixed(all_schedule_requests, sequencing)
 fulfilled_requests = num_fulfilled_requests(all_schedule_requests, timetables)
 
 
